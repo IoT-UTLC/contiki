@@ -36,6 +36,7 @@
 #include "net/ipv6/uip-ds6.h"
 #include "net/ip/uip-udp-packet.h"
 #include "sys/ctimer.h"
+#include "sys/timer.h"
 #include "../example.h"
 #include <stdio.h>
 #include <string.h>
@@ -59,6 +60,7 @@
 /*---------------------------------------------------------------------------*/
 /* Default is to send a packet every 60 seconds */
 #define SEND_INTERVAL (60 * CLOCK_SECOND)
+static struct etimer tim;
 /*---------------------------------------------------------------------------*/
 /* Variable used to send only once with user button*/
 int i = 0;
@@ -75,26 +77,39 @@ static uint16_t counter = 0;
 /* Keeps account of the number of false messages received */
 static uint16_t wrong_data_ctr = 0;
 
+/* Keep global track of trafficlight state */
+static uint16_t my_state;
+
+/* Flag to reset Re-mote etimer */
 static int RESET = 0;
+/* Flag to pause Re-mote etimer */
+static int PAUSE = 0;
+
+static struct etimer periodic;
 /*---------------------------------------------------------------------------*/
 /* Create a structure and pointer to store the data to be sent as payload */
 static struct my_msg_t msg;
 static struct my_msg_t *msgPtr = &msg;
 
-typedef struct {
+typedef struct
+{
   int data;
   int qos;
   int option;
-}MSG_RCV;
+} MSG_RCV;
+
+/* Create a structure to store the data received */
+static MSG_RCV *rcv;
 /*---------------------------------------------------------------------------*/
-PROCESS(udp_client_process, "UDP client example process");
+PROCESS(udp_client_process, "Trafficlight control process");
 AUTOSTART_PROCESSES(&udp_client_process);
 
 /*---------------------------------------------------------------------------*/
 static void
 state_trafficlight(int value)
 {
-  if (value > 2) printf("Err value: %u", value);
+  if (value > 2)
+    printf("Err value: %u", value);
   switch (value)
   {
   case 0:
@@ -125,32 +140,40 @@ static void
 tcpip_handler(void)
 {
   char *str;
-  //struct my_msg_t *msg_rcv = malloc(sizeof(struct my_msg_t));
-  MSG_RCV *rcv = malloc(sizeof(MSG_RCV));
+  rcv = malloc(sizeof(MSG_RCV));
   if (uip_newdata())
   {
-    // str = uip_appdata;
-    // str[uip_datalen()] = '\0';
-    // printf("Received from the server: '%s'\n", str);
-    //msg_rcv = uip_appdata;
-    //memcpy((void*) msg_rcv, uip_appdata,sizeof(struct my_msg_t));
-    memcpy((void*) rcv, uip_appdata,sizeof(MSG_RCV));
-    
-    //printf("Test des valeurs : id:%u counter:%u data:%d qos:% battery:%u\n", msg_rcv->id, msg_rcv->counter,msg_rcv->value1, msg_rcv->value2, msg_rcv->battery);
-    printf("Test des valeurs : data:%u qos:%u option:%u\n", rcv->data, rcv->qos,rcv->option);
+    /* Get the buffer pointer */
+    rcv = uip_appdata;
+    printf("Test des valeurs : data:%u qos:%u option:%u\n", rcv->data, rcv->qos, rcv->option);
 
-    if(msg.value1 != rcv->data){
-      printf("New value %u != %u \n", msg.value1, rcv->data);
-      state_trafficlight(rcv->data);
-      msg.value1 = rcv->data;
-    }else {
-      printf("%u == %u \n", msg.value1, rcv->data);
-    }
-    if(rcv->qos == 2) RESET = 1;
-    if(rcv->data > 2000 && rcv->qos > 200 && rcv->option > 200)
+    printf("My state %u \n", my_state);
+
+    if (my_state != rcv->data) /* New state */
     {
+      printf("New value %u != %u \n", my_state, rcv->data);
+
+      if (rcv->data == 0)
+      {
+        state_trafficlight(1);
+      }
+      printf("Data given: %u \n", rcv->data);
+      PAUSE = 1;
+      state_trafficlight(rcv->data);
+      my_state = rcv->data;
+    }
+    else
+    {
+      printf("%u == %u \n", my_state, rcv->data);
+    }
+    if (rcv->qos == 2) /* if QOS = 2 new state is not a classic cycle and timer need to be reset */
+      RESET = 1;
+    if (rcv->data > 2000 && rcv->qos > 200 && rcv->option > 200)
+    { //Buffer overflow detected
       wrong_data_ctr++;
-      if(wrong_data_ctr > 10) sys_ctrl_reset();
+      printf("wrong\n");
+      if (wrong_data_ctr > 10)
+        sys_ctrl_reset();
     }
   }
 }
@@ -162,11 +185,13 @@ send_packet_event(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x1; /* Set traffic light/sensor ID */
+  msg.id = 0x3; /* Set traffic light/sensor ID */
   msg.counter = counter;
-  if (msg.value1 == 0) msg.value1 = 2; else msg.value1 = 0;
-  //msg.value1 = rand() % 3; /* Set traffic light state */
-  msg.value2 = 0;          /* Set QoS */
+  if (my_state == 0)  /* Set traffic light state */
+    msg.value1 = 2;
+  else
+    msg.value1 = 0;
+  msg.value2 = 0; /* Set QoS */
 
   aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
   msg.battery = (uint16_t)aux;
@@ -174,42 +199,6 @@ send_packet_event(void)
   /* Print the sensor data */
   printf("ID: %u, Counter : %u, Value: %d, QoS: %d, batt: %u\n",
          msg.id, msg.counter, msg.value1, msg.value2, msg.battery);
-
-
-  /* Convert to network byte order as expected by the UDP Server application */
-  msg.counter = UIP_HTONS(msg.counter);
-  msg.value1 = UIP_HTONS(msg.value1);
-  msg.battery = UIP_HTONS(msg.battery);
-
-  PRINTF("Send readings to %u'\n",
-         server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
-
-  uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
-                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-  
-  if(msg.value1 == 2) clock_delay(3); // Trick for the model purpose
-  state_trafficlight(msg.value1);
-}
-/*---------------------------------------------------------------------------*/
-static void
-send_packet_sensor(void)
-{
-  uint16_t aux;
-  counter++;
-
-  msg.id = 0x1; /* Set traffic light/sensor ID */
-  msg.counter = counter;
-  if (msg.value1 == 0) msg.value1 = 2; else msg.value1 = 0;
-  //msg.value1 = rand() % 3; /* Set traffic light state */
-  msg.value2 = 2;          /* Set QoS */
-
-  aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
-  msg.battery = (uint16_t)aux;
-
-  /* Print the sensor data */
-  printf("ID: %u, Counter : %u, Value: %d, QoS: %d, batt: %u\n",
-         msg.id, msg.counter, msg.value1, msg.value2, msg.battery);
-
 
   /* Convert to network byte order as expected by the UDP Server application */
   uint16_t tmpval = msg.value1;
@@ -222,12 +211,60 @@ send_packet_sensor(void)
 
   uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-  
-  /* Trick for the model purpose */
-  if (tmpval== 0) state_trafficlight(1);
-  if (tmpval == 2) clock_delay(3);
 
-  state_trafficlight(tmpval);
+  /* Trick for the model purpose */
+  msg.value1 = tmpval;
+}
+/*---------------------------------------------------------------------------*/
+static void
+send_packet_sensor(void)
+{
+  uint16_t aux;
+  counter++;
+
+  msg.id = 0x3; /* Set traffic light/sensor ID */
+  msg.counter = counter;
+  if (my_state == 0)  /* Set traffic light state */
+    msg.value1 = 2;
+  else
+    msg.value1 = 0;
+  msg.value2 = 2; /* Set QoS */
+
+  aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
+  msg.battery = (uint16_t)aux;
+
+  /* Print the sensor data */
+  printf("ID: %u, Counter : %u, Value: %d, QoS: %d, batt: %u\n",
+         msg.id, msg.counter, msg.value1, msg.value2, msg.battery);
+
+  /* Convert to network byte order as expected by the UDP Server application */
+  uint16_t tmpval = msg.value1;
+  msg.counter = UIP_HTONS(msg.counter);
+  msg.value1 = UIP_HTONS(msg.value1);
+  msg.battery = UIP_HTONS(msg.battery);
+
+  PRINTF("Send readings to %u'\n",
+         server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
+
+  uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
+                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
+
+  /* Trick for the model purpose [Tests only] */
+  msg.value1 = tmpval;
+  printf("%u\n", my_state);
+
+  if (msg.value1 == 0)
+  {
+    state_trafficlight(1);
+    printf("Pause timer\n");
+    PAUSE = 1;
+    state_trafficlight(msg.value1);
+  }
+  else
+  {
+    my_state = msg.value1;
+    state_trafficlight(msg.value1);
+  }
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -271,7 +308,7 @@ set_global_address(void)
  * Note the IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
 
-  /* Remplacer '0xaaaa' par 'fd00' si c'est du local */
+  /* Replace '0xaaaa' by 'fd00' if local */
   uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
   uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
   uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
@@ -279,7 +316,6 @@ set_global_address(void)
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(udp_client_process, ev, data)
 {
-  static struct etimer periodic;
 
   PROCESS_BEGIN();
 
@@ -314,7 +350,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
 
   SENSORS_ACTIVATE(button_sensor);
   leds_on(LEDS_RED); //Traffic lights 2 & 4 start at green, 1 & 3 at red
-
+  my_state = 0;
 
   /* Create a new connection with remote host.  When a connection is created
    * with udp_new(), it gets a local port number assigned automatically.
@@ -354,22 +390,31 @@ PROCESS_THREAD(udp_client_process, ev, data)
       tcpip_handler();
     }
     i = i + 1;
-    /* Send data to the server */
-    /* QoS 0: Non-priority data sent every 30 seconds */
-    // if (ev == PROCESS_EVENT_TIMER)
-    // {
-    //   send_packet_event();
-    //   if (etimer_expired(&periodic))
-    //   {
-    //     etimer_reset(&periodic);
-    //   }
-    // }
     if (RESET)
     {
       printf("RESET !! %u\n", RESET);
-      //etimer_restart(&periodic);
-      etimer_adjust(&periodic, 30);
-      RESET = 0; 
+      if (msg.id == 1) /* Reset time for trafficlight 1 cycle of 30s */
+        etimer_set(&periodic, SEND_INTERVAL / 2);
+      else /* Trafficlight 2 cycle of 1 min for 30s shift between the 2 */
+        etimer_set(&periodic, SEND_INTERVAL);
+      RESET = 0;
+    }
+    if (PAUSE)
+    {
+      printf("Pause\n");
+      etimer_set(&tim, 3 * CLOCK_SECOND);
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tim));
+      PAUSE = 0;
+    }
+    /* Send data to the server */
+    /* QoS 0: Non-priority data sent every minutes with 30s shift for data sent to server every 30s */
+    if (ev == PROCESS_EVENT_TIMER)
+    {
+      send_packet_event();
+      if (etimer_expired(&periodic))
+      {
+        etimer_reset(&periodic);
+      }
     }
 
     /* QoS 2: Priority data when pressing the user button */

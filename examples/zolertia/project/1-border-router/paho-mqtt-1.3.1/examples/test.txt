@@ -1,0 +1,98 @@
+UDP6-MQTT server side application V0.1
+Started 2018-04-25 16:54:32.446998
+Socket created
+socket : <socket._socketobject object at 0x7fe177a6e1a0>
+setsockopt : None
+UDP6-MQTT server ready: 5678
+msg structure size:  7
+
+Connected with result code 0
+Subscribed to /v1.6/devices/zolertia/#
+/v1.6/devices/zolertia/feu1/lv 0, qoss: 1
+/v1.6/devices/zolertia/feu1 {"timestamp": 1524668008567, "context": {}, "value": 0.0, "id": "5ae0966b5916366dbeee61b2"}, qoss: 1
+/v1.6/devices/zolertia/feu2/lv 2, qoss: 1
+/v1.6/devices/zolertia/feu2 {"timestamp": 1524668008720, "context": {}, "value": 2.0, "id": "5ae0966b5916366dda3c29de"}, qoss: 1
+/v1.6/devices/zolertia/feu3/lv 2, qoss: 1
+/v1.6/devices/zolertia/feu3 {"timestamp": 1524134541616, "context": {}, "value": 2.0, "id": "5ad872907625426e9b0adf0d"}, qoss: 1
+2018-04-25 16:54:58 -> aaaa::212:4b00:60d:b374:8765 14
+***
+id:2  counter:1  ADC1:213  ADC2:1  battery:0 
+***
+
+Data receiv :  1 by feu :  2
+
+
+Data directly sent to Ubidots without verification
+
+MQTT: Publishing to /v1.6/devices/zolertia/feu1 with value : 1
+MQTT: Publishing to /v1.6/devices/zolertia/feu2 with value : 1
+
+Data publishing
+
+Sending reply to aaaa::212:4b00:60d:b3ef
+('aaaa::212:4b00:60d:b3ef', 8765)
+Data sent : A
+/v1.6/devices/zolertia/feu2 {"timestamp": 1524668098723, "context": {}, "value": 1.0, "id": "5ae096c259163670f6e22f6e"}, qoss: 0
+/v1.6/devices/zolertia/feu2/lv 1, qoss: 0
+/v1.6/devices/zolertia/feu1 {"timestamp": 1524668098571, "context": {}, "value": 1.0, "id": "5ae096c559163672d41f2e91"}, qoss: 0
+/v1.6/devices/zolertia/feu1/lv 1, qoss: 0
+2018-04-25 16:55:28 -> aaaa::212:4b00:60d:b374:8765 14
+***
+id:2  counter:1  ADC1:214  ADC2:2  battery:0 
+***
+
+Data receiv :  2 by feu :  2
+
+
+Data directly sent to Ubidots without verification
+
+MQTT: Publishing to /v1.6/devices/zolertia/feu1 with value : 0
+MQTT: Publishing to /v1.6/devices/zolertia/feu2 with value : 2
+
+Data publishing
+
+Sending reply to aaaa::212:4b00:60d:b3ef
+('aaaa::212:4b00:60d:b3ef', 8765)
+Data sent : A
+/v1.6/devices/zolertia/feu1 {"timestamp": 1524668128569, "context": {}, "value": 0.0, "id": "5ae096e1591636702b657589"}, qoss: 0
+/v1.6/devices/zolertia/feu1/lv 0, qoss: 0
+/v1.6/devices/zolertia/feu2 {"timestamp": 1524668128723, "context": {}, "value": 2.0, "id": "5ae096e5591636735b9bea9b"}, qoss: 0
+/v1.6/devices/zolertia/feu2/lv 2, qoss: 0
+2018-04-25 16:55:58 -> aaaa::212:4b00:60d:b374:8765 14
+***
+id:2  counter:1  ADC1:215  ADC2:2  battery:0 
+***
+
+Data receiv :  2 by feu :  2
+
+
+Data directly sent to Ubidots without verification
+
+MQTT: Publishing to /v1.6/devices/zolertia/feu1 with value : 0
+MQTT: Publishing to /v1.6/devices/zolertia/feu2 with value : 2
+
+Data publishing
+
+Sending reply to aaaa::212:4b00:60d:b3ef
+('aaaa::212:4b00:60d:b3ef', 8765)
+Data sent : A
+/v1.6/devices/zolertia/feu2 {"timestamp": 1524668158718, "context": {}, "value": 2.0, "id": "5ae096fe591636746a0fa0e4"}, qoss: 0
+/v1.6/devices/zolertia/feu2/lv 2, qoss: 0
+/v1.6/devices/zolertia/feu1 {"timestamp": 1524668158564, "context": {}, "value": 0.0, "id": "5ae096ff59163675f9144792"}, qoss: 0
+/v1.6/devices/zolertia/feu1/lv 0, qoss: 0
+2018-04-25 16:56:28 -> aaaa::212:4b00:60d:b374:8765 14
+***
+id:2  counter:1  ADC1:216  ADC2:0  battery:0 
+***
+
+Data receiv :  0 by feu :  2
+
+
+Data directly sent to Ubidots without verification
+
+
+Data publishing
+
+Sending reply to aaaa::212:4b00:60d:b3ef
+('aaaa::212:4b00:60d:b3ef', 8765)
+Data sent : A
