@@ -44,8 +44,8 @@
 #else /* default is Z1 */
 #define EXAMPLE_TX_POWER  31
 #endif
-#define EXAMPLE_CHANNEL   26
-#define EXAMPLE_PANID     0xABCD
+#define EXAMPLE_CHANNEL   15
+#define EXAMPLE_PANID     0xBEEF
 
 /*---------------------------------------------------------------------------*/
 /* This data structure is used to store the packet content (payload) */

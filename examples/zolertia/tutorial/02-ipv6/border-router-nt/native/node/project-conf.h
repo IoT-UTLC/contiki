@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Zolertia - http://www.zolertia.com
+ * Copyright (c) 2010, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,38 +25,54 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- */
-/**
- * \author Antonio Lignan <alinan@zolertia.com>
  */
 
-#ifndef EXAMPLE_
-#define EXAMPLE_
-/*---------------------------------------------------------------------------*/
-/* This is the UDP port used to send and receive data */
-#define UDP_CLIENT_PORT   8765
-#define UDP_SERVER_PORT   5678
+#ifndef PROJECT_CONF_H_
+#define PROJECT_CONF_H_
 
-/* Radio values to be configured for the 01-udp-local-multicast example */
-#if CONTIKI_TARGET_ZOUL
-#define EXAMPLE_TX_POWER  0xFF
-#else /* default is Z1 */
-#define EXAMPLE_TX_POWER  31
+#undef QUEUEBUF_CONF_NUM
+#define QUEUEBUF_CONF_NUM          4
+
+#undef UIP_CONF_BUFFER_SIZE
+#define UIP_CONF_BUFFER_SIZE    140
+
+#undef UIP_CONF_ROUTER
+#define UIP_CONF_ROUTER                 0
+
+#define CMD_CONF_OUTPUT slip_radio_cmd_output
+
+/* add the cmd_handler_cc2420 + some sensors if TARGET_SKY */
+#ifdef CONTIKI_TARGET_SKY
+#define CMD_CONF_HANDLERS slip_radio_cmd_handler,cmd_handler_cc2420
+#define SLIP_RADIO_CONF_SENSORS slip_radio_sky_sensors
+/* add the cmd_handler_rf230 if TARGET_NOOLIBERRY. Other RF230 platforms can be added */
+#elif CONTIKI_TARGET_NOOLIBERRY
+#define CMD_CONF_HANDLERS slip_radio_cmd_handler,cmd_handler_rf230
+#elif CONTIKI_TARGET_ECONOTAG
+#define CMD_CONF_HANDLERS slip_radio_cmd_handler,cmd_handler_mc1322x
+#else
+#define CMD_CONF_HANDLERS slip_radio_cmd_handler
 #endif
-#define EXAMPLE_CHANNEL   26
-#define EXAMPLE_PANID     0xABCD
 
-/*---------------------------------------------------------------------------*/
-/* This data structure is used to store the packet content (payload) */
-struct my_msg_t {
-  uint8_t  id;
-  uint16_t counter;
-  uint16_t value1;
-  uint16_t value2;
-  uint16_t value3;
-  uint16_t value4;
-  uint16_t battery;
-};
-/*---------------------------------------------------------------------------*/
-#endif /* __TEST_EXAMPLE__ */
+
+/* configuration for the slipradio/network driver */
+#undef NETSTACK_CONF_MAC
+#define NETSTACK_CONF_MAC     nullmac_driver
+
+#undef NETSTACK_CONF_RDC
+/* #define NETSTACK_CONF_RDC     nullrdc_noframer_driver */
+#define NETSTACK_CONF_RDC     contikimac_driver
+
+#undef NETSTACK_CONF_NETWORK
+#define NETSTACK_CONF_NETWORK slipnet_driver
+
+#undef NETSTACK_CONF_FRAMER
+#define NETSTACK_CONF_FRAMER no_framer
+
+#undef CC2420_CONF_AUTOACK
+#define CC2420_CONF_AUTOACK              1
+
+#undef UART1_CONF_RX_WITH_DMA
+#define UART1_CONF_RX_WITH_DMA           1
+
+#endif /* PROJECT_CONF_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Zolertia - http://www.zolertia.com
+ * Copyright (c) 2011, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,36 +27,15 @@
  * SUCH DAMAGE.
  *
  */
-/**
- * \author Antonio Lignan <alinan@zolertia.com>
- */
 
-#ifndef EXAMPLE_
-#define EXAMPLE_
-/*---------------------------------------------------------------------------*/
-/* This is the UDP port used to send and receive data */
-#define UDP_CLIENT_PORT   8765
-#define UDP_SERVER_PORT   5678
+#ifndef SLIP_RADIO_H_
+#define SLIP_RADIO_H_
 
-/* Radio values to be configured for the 01-udp-local-multicast example */
-#if CONTIKI_TARGET_ZOUL
-#define EXAMPLE_TX_POWER  0xFF
-#else /* default is Z1 */
-#define EXAMPLE_TX_POWER  31
-#endif
-#define EXAMPLE_CHANNEL   26
-#define EXAMPLE_PANID     0xABCD
-
-/*---------------------------------------------------------------------------*/
-/* This data structure is used to store the packet content (payload) */
-struct my_msg_t {
-  uint8_t  id;
-  uint16_t counter;
-  uint16_t value1;
-  uint16_t value2;
-  uint16_t value3;
-  uint16_t value4;
-  uint16_t battery;
+struct slip_radio_sensors {
+  /** Initialize the driver */
+  void (* init)(void);
+  /** Send the sensor data packet via the command send */
+  void (* send)(void);
 };
-/*---------------------------------------------------------------------------*/
-#endif /* __TEST_EXAMPLE__ */
+
+#endif /* SLIP_RADIO_H_ */

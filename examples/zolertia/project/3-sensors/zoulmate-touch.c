@@ -125,7 +125,7 @@ send_packet_sensor(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x1; /* Set traffic light/sensor ID */
+  msg.id = 0x6; /* Set traffic light/sensor ID */
   msg.counter = counter;
   msg.value1 = 2; /* Set traffic light state */
   msg.value2 = 2; /* Set QoS */
@@ -198,6 +198,7 @@ PROCESS_THREAD(zoulmate_demo_process, ev, data)
     {
       /* For quick debugging*/
       printf("Value: %u\n", adc_zoul.value(ZOUL_SENSORS_ADC1));
+      //printf("Value2: %u\n", adc_zoul.value(ZOUL_SENSORS_ADC2));
       /* If a touch is detected */
       if (adc_zoul.value(ZOUL_SENSORS_ADC1) > 20000)
       {

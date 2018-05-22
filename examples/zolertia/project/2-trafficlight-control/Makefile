@@ -1,4 +1,4 @@
-all: 03-udp-client simple-udp-client nt-cli-serv
+all: trafficlight-control pre-control
 
 # Linker optimizations
 SMALL = 1
@@ -6,7 +6,7 @@ SMALL = 1
 # Includes the project-conf configuration file
 CFLAGS += -DPROJECT_CONF_H=\"../project-conf.h\"
 
-CONTIKI = ../../../../..
+CONTIKI = ../../../..
 
 # This flag includes the IPv6 libraries
 CONTIKI_WITH_IPV6 = 1

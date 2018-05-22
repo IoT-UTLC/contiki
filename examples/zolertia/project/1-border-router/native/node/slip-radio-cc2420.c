@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Zolertia - http://www.zolertia.com
+ * Copyright (c) 2011, Swedish Institute of Computer Science
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,37 +26,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * This file is part of the Contiki operating system.
+ *
+ * Sets up some commands for the CC2420 radio chip.
  */
-/**
- * \author Antonio Lignan <alinan@zolertia.com>
- */
 
-#ifndef EXAMPLE_
-#define EXAMPLE_
-/*---------------------------------------------------------------------------*/
-/* This is the UDP port used to send and receive data */
-#define UDP_CLIENT_PORT   8765
-#define UDP_SERVER_PORT   5678
+#include "contiki.h"
+#include "cc2420.h"
+#include "cmd.h"
+#include <stdio.h>
 
-/* Radio values to be configured for the 01-udp-local-multicast example */
-#if CONTIKI_TARGET_ZOUL
-#define EXAMPLE_TX_POWER  0xFF
-#else /* default is Z1 */
-#define EXAMPLE_TX_POWER  31
-#endif
-#define EXAMPLE_CHANNEL   26
-#define EXAMPLE_PANID     0xABCD
-
-/*---------------------------------------------------------------------------*/
-/* This data structure is used to store the packet content (payload) */
-struct my_msg_t {
-  uint8_t  id;
-  uint16_t counter;
-  uint16_t value1;
-  uint16_t value2;
-  uint16_t value3;
-  uint16_t value4;
-  uint16_t battery;
-};
-/*---------------------------------------------------------------------------*/
-#endif /* __TEST_EXAMPLE__ */
+int
+cmd_handler_cc2420(const uint8_t *data, int len)
+{
+  if(data[0] == '!') {
+    if(data[1] == 'C') {
+      printf("cc2420_cmd: setting channel: %d\n", data[2]);
+      cc2420_set_channel(data[2]);
+      return 1;
+    }
+  } else if(data[0] == '?') {
+    if(data[1] == 'C') {
+      uint8_t buf[4];
+      printf("cc2420_cmd: getting channel: %d\n", data[2]);
+      buf[0] = '!';
+      buf[1] = 'C';
+      buf[2] = cc2420_get_channel();
+      cmd_send(buf, 3);
+      return 1;
+    }
+  }
+  return 0;
+}

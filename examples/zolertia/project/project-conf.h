@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Zolertia - http://www.zolertia.com
+ * Copyright (c) 2010, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,36 +27,43 @@
  * SUCH DAMAGE.
  *
  */
-/**
- * \author Antonio Lignan <alinan@zolertia.com>
- */
-
-#ifndef EXAMPLE_
-#define EXAMPLE_
 /*---------------------------------------------------------------------------*/
-/* This is the UDP port used to send and receive data */
-#define UDP_CLIENT_PORT   8765
-#define UDP_SERVER_PORT   5678
+#ifndef PROJECT_CONF_H_
+#define PROJECT_CONF_H_
 
-/* Radio values to be configured for the 01-udp-local-multicast example */
-#if CONTIKI_TARGET_ZOUL
-#define EXAMPLE_TX_POWER  0xFF
-#else /* default is Z1 */
-#define EXAMPLE_TX_POWER  31
+/* Comment this out to use Radio Duty Cycle (RDC) and save energy */
+#undef NETSTACK_CONF_RDC
+#define NETSTACK_CONF_RDC          nullrdc_driver
+
+#undef IEEE802154_CONF_PANID
+#define IEEE802154_CONF_PANID      0xABCD
+
+#ifndef QUEUEBUF_CONF_NUM
+#define QUEUEBUF_CONF_NUM          4
 #endif
-#define EXAMPLE_CHANNEL   26
-#define EXAMPLE_PANID     0xABCD
+
+#undef UIP_CONF_BUFFER_SIZE
+#define UIP_CONF_BUFFER_SIZE       256
+
+#ifndef UIP_CONF_RECEIVE_WINDOW
+#define UIP_CONF_RECEIVE_WINDOW    60
+#endif
+
+#ifndef WEBSERVER_CONF_CFS_CONNS
+#define WEBSERVER_CONF_CFS_CONNS   2
+#endif
+
+/* The following are Z1 specific */
+#undef RF_CHANNEL
+#define RF_CHANNEL	           26
+
+#undef CC2420_CONF_CHANNEL
+#define CC2420_CONF_CHANNEL        26
+
+/* The following are Zoul (RE-Mote, etc) specific */
+#undef CC2538_RF_CONF_CHANNEL
+#define CC2538_RF_CONF_CHANNEL     26
+
 
 /*---------------------------------------------------------------------------*/
-/* This data structure is used to store the packet content (payload) */
-struct my_msg_t {
-  uint8_t  id;
-  uint16_t counter;
-  uint16_t value1;
-  uint16_t value2;
-  uint16_t value3;
-  uint16_t value4;
-  uint16_t battery;
-};
-/*---------------------------------------------------------------------------*/
-#endif /* __TEST_EXAMPLE__ */
+#endif /* PROJECT_CONF_H_ */
