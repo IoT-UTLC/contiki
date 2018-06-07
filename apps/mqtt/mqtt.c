@@ -229,6 +229,7 @@ abort_connection(struct mqtt_connection *conn)
   tcp_socket_unregister(&conn->socket);
 
   memset(&conn->socket, 0, sizeof(conn->socket));
+  DBG("Abord connection\n");
 
   conn->state = MQTT_CONN_STATE_NOT_CONNECTED;
 }
@@ -1115,6 +1116,7 @@ tcp_event(struct tcp_socket *s, void *ptr, tcp_socket_event_t event)
     DBG("MQTT - Disconnected by tcp event %d\n", event);
     process_post(&mqtt_process, mqtt_abort_now_event, conn);
     conn->state = MQTT_CONN_STATE_NOT_CONNECTED;
+    DBG("state not connected\n");
     ctimer_stop(&conn->keep_alive_timer);
     call_event(conn, MQTT_EVENT_DISCONNECTED, &event);
     abort_connection(conn);
@@ -1370,17 +1372,20 @@ mqtt_status_t
 mqtt_subscribe(struct mqtt_connection *conn, uint16_t *mid, char *topic,
                mqtt_qos_level_t qos_level)
 {
+  DBG("STATE\n");
+  DBG("State %u != %u\n", conn->state, MQTT_CONN_STATE_CONNECTED_TO_BROKER);
   if(conn->state != MQTT_CONN_STATE_CONNECTED_TO_BROKER) {
     return MQTT_STATUS_NOT_CONNECTED_ERROR;
   }
 
+
   DBG("MQTT - Call to mqtt_subscribe...\n");
 
   /* Currently don't have a queue, so only one item at a time */
-  if(conn->out_queue_full) {
-    DBG("MQTT - Not accepted!\n");
-    return MQTT_STATUS_OUT_QUEUE_FULL;
-  }
+  // if(conn->out_queue_full) {
+  //   DBG("MQTT - Not accepted!\n");
+  //   return MQTT_STATUS_OUT_QUEUE_FULL;
+  // }
   conn->out_queue_full = 1;
   DBG("MQTT - Accepted!\n");
 
@@ -1419,11 +1424,13 @@ mqtt_unsubscribe(struct mqtt_connection *conn, uint16_t *mid, char *topic)
   return MQTT_STATUS_OK;
 }
 /*----------------------------------------------------------------------------*/
+static int counter = 0;
 mqtt_status_t
 mqtt_publish(struct mqtt_connection *conn, uint16_t *mid, char *topic,
              uint8_t *payload, uint32_t payload_size,
              mqtt_qos_level_t qos_level, mqtt_retain_t retain)
 {
+  DBG("STATEPUB : %u != %u", conn->state, MQTT_CONN_STATE_CONNECTED_TO_BROKER);
   if(conn->state != MQTT_CONN_STATE_CONNECTED_TO_BROKER) {
     return MQTT_STATUS_NOT_CONNECTED_ERROR;
   }
@@ -1433,6 +1440,12 @@ mqtt_publish(struct mqtt_connection *conn, uint16_t *mid, char *topic,
   /* Currently don't have a queue, so only one item at a time */
   if(conn->out_queue_full) {
     DBG("MQTT - Not accepted!\n");
+    counter++;
+    if(counter > 1) {
+      conn->out_queue_full = 0;
+      counter = 0;
+      DBG("Counter : %u", counter);
+    }
     return MQTT_STATUS_OUT_QUEUE_FULL;
   }
   conn->out_queue_full = 1;
