@@ -181,6 +181,8 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			print "Data directly sent to Ubidots without verification"
 			print
 
+		time.sleep(0.9)
+
 		if (TOPIC == 'sensor1') and data == "1":
 			#conn.publish.multiple(msgs, hostname=MQTT_URL)
 
@@ -262,7 +264,7 @@ def start_client():
 		# Allow connexion to the broker
 		client.on_connect = on_connect
 		# Set your Ubidots default token
-		client.username_pw_set("A1E-Zdfehlc7EmA9JEer6YIARbtHIMK1y8", "") #A1E-dEzBw6HHcOgRUz22KIwvuYkfvmfixy
+		client.username_pw_set("A1E-Zdfehlc7EmA9JEer6YIARbtHIMK1y8", "") #A1E-Zdfehlc7EmA9JEer6YIARbtHIMK1y8
 		client.on_message = on_message
 
 		try:
@@ -275,6 +277,7 @@ def start_client():
 	# being triggered
 	client.loop_start()
 	
+	totot = 1
 	while True:
 
 		# Receiving client data (data, addr)
@@ -291,8 +294,19 @@ def start_client():
 		sensordata = jsonify_recv_data(msg_recv)	
 		QOS = jsonify_recv_QOS(msg_recv)
 
-		if ENABLE_MQTT:
-			publish_recv_data(sensordata, msg_recv.id, client, addr[0],QOS)
+		# if ENABLE_MQTT:
+		# 	publish_recv_data(sensordata, msg_recv.id, client, addr[0],QOS)
+
+		print "sending a data"
+		if(totot):
+			res, mid = client.publish(MQTT_URL_PUB + 'sensor1', payload="3", qos=0)
+			print "totot 1"
+			totot = 0
+		else:
+			res, mid = client.publish(MQTT_URL_PUB + 'sensor1', payload="5", qos=0)
+			print "totot x"
+			totot = 1
+
 
 		# if UPDATE_NEEDED:
 		# 	print "UPDATE"

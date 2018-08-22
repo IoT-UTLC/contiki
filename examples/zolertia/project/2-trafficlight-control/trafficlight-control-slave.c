@@ -202,7 +202,7 @@ tcpip_handler(void)
     if (rcv->option) {
         printf("Time to confirm\n");
         // Send confirmation of the new state
-        msg.id = 0x1;
+        msg.id = 0x3;
         msg.counter = counter;
         msg.value1 = my_state;
         msg.value2 = 1; /* Set QoS */
@@ -224,10 +224,11 @@ tcpip_handler(void)
         msg.value1 = tmpval;
 
     }
-    if (rcv->qos == 2) { /* if QOS = 2 new state is not a classic cycle and timer need to be reset */
-      RESET = 1;
-      printf("Got Reset qos 2 \n");
-    }
+    
+    // if (rcv->qos == 2) { /* if QOS = 2 new state is not a classic cycle and timer need to be reset */
+    //   RESET = 1;
+    //   printf("Got Reset qos 2 \n");
+    // }
     if (rcv->data > 2000 && rcv->qos > 200 && rcv->option > 200)
     { //Buffer overflow detected
       wrong_data_ctr++;
@@ -245,12 +246,13 @@ send_packet_event(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x1; /* Set traffic light/sensor ID */
+  msg.id = 0x3; /* Set traffic light/sensor ID */
   msg.counter = counter;
-  if (my_state == 0)  /* Set traffic light state */
-    msg.value1 = 2;
-  else
-    msg.value1 = 0;
+  // if (my_state == 0)  /* Set traffic light state */
+  //   msg.value1 = 2;
+  // else
+  //   msg.value1 = 0;
+  msg.value1 = 8;
   msg.value2 = 0; /* Set QoS */
   msg.value3 = 0; /* Set Confirmation */
 
@@ -293,12 +295,13 @@ send_packet_sensor(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x1; /* Set traffic light/sensor ID */
+  msg.id = 0x3; /* Set traffic light/sensor ID */
   msg.counter = counter;
-  if (my_state == 0)  /* Set traffic light state */
-    msg.value1 = 2;
-  else
-    msg.value1 = 0;
+  // if (my_state == 0)  /* Set traffic light state */
+  //   msg.value1 = 2;
+  // else
+  //   msg.value1 = 0;
+  msg.value1 = 8;
   msg.value2 = 2; /* Set QoS */
   msg.value3 = 1; /* Set Confirmation */
 
@@ -462,19 +465,19 @@ PROCESS_THREAD(udp_client_process, ev, data)
       tcpip_handler();
     }
     i = i + 1;
-    if (RESET)
-    {
-      printf("RESET !! %u\n", RESET);
-      if (msg.id == 1) { /* Reset time for trafficlight 1 cycle of 30s */
-        etimer_set(&periodic, SEND_INTERVAL / 2);
-        printf("RESET feu1");
-      }
-      else { /* Trafficlight 2 cycle of 1 min for 30s shift between the 2 */
-        etimer_set(&periodic, SEND_INTERVAL);
-        printf("RESET feu2");
-      }
-      RESET = 0;
-    }
+    // if (RESET)
+    // {
+    //   printf("RESET !! %u\n", RESET);
+    //   if (msg.id == 1) { /* Reset time for trafficlight 1 cycle of 30s */
+    //     etimer_set(&periodic, SEND_INTERVAL / 2);
+    //     printf("RESET feu1");
+    //   }
+    //   else { /* Trafficlight 2 cycle of 1 min for 30s shift between the 2 */
+    //     etimer_set(&periodic, SEND_INTERVAL);
+    //     printf("RESET feu2");
+    //   }
+    //   RESET = 0;
+    // }
 
     if (PAUSE)
     {
@@ -482,25 +485,25 @@ PROCESS_THREAD(udp_client_process, ev, data)
       etimer_set(&tim, 3 * CLOCK_SECOND);
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tim));
       PAUSE = 0;
-      TT = 1;
+      //TT = 1;
     }
     /* Send data to the server */
     /* QoS 0: Non-priority data sent every minutes with 30s shift for data sent to server every 30s */
-    if (ev == PROCESS_EVENT_TIMER)
-    {
-      if(PAUSE==1 || TT == 1){
-        printf("I've got PAUSE\n");
-        PAUSE=0;
-        TT=0;
-      }else {
-        printf("Get to PROCESS_EVENT_TIMER\n");
-        send_packet_event();
-        if (etimer_expired(&periodic))
-        {
-          etimer_reset(&periodic);
-        }
-      }
-    }
+    // if (ev == PROCESS_EVENT_TIMER)
+    // {
+    //   if(PAUSE==1 || TT == 1){
+    //     printf("I've got PAUSE\n");
+    //     PAUSE=0;
+    //     TT=0;
+    //   }else {
+    //     printf("Get to PROCESS_EVENT_TIMER\n");
+    //     send_packet_event();
+    //     if (etimer_expired(&periodic))
+    //     {
+    //       etimer_reset(&periodic);
+    //     }
+    //   }
+    // }
 
     /* QoS 2: Priority data when pressing the user button */
     if (ev == sensors_event && data == &button_sensor)
