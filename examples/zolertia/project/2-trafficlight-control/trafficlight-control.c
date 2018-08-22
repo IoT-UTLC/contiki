@@ -408,14 +408,14 @@ PROCESS_THREAD(udp_client_process, ev, data)
     }
     /* Send data to the server */
     /* QoS 0: Non-priority data sent every minutes with 30s shift for data sent to server every 30s */
-    if (ev == PROCESS_EVENT_TIMER)
-    {
-      send_packet_event();
-      if (etimer_expired(&periodic))
-      {
-        etimer_reset(&periodic);
-      }
-    }
+    // if (ev == PROCESS_EVENT_TIMER)
+    // {
+    //   send_packet_event();
+    //   if (etimer_expired(&periodic))
+    //   {
+    //     etimer_reset(&periodic);
+    //   }
+    // }
 
     /* QoS 2: Priority data when pressing the user button */
     if (ev == sensors_event && data == &button_sensor)
