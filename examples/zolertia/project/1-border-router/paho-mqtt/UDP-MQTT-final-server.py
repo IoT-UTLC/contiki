@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
 #! /usr/bin/env python
+# -----------------------------------------------------------------
+#
+# Traffic lights developement for IoT-UTLC project by Jérémy Petit
+# jeremy.petit2@outlook.fr
+# and 6 ECE Paris students
+# -----------------------------------------------------------------
+
+
+
 import sys
 import paho.mqtt.client as mqtt
 import json
@@ -10,26 +19,31 @@ from random import randint
 import struct
 from ctypes import *
 #------------------------------------------------------------#
-# Explication des variables
+# Variables
 #------------------------------------------------------------#
-# Nous avions définis 3 valeurs pour 3 couleurs différentes à envoyer au Broker
-# Nous récupérions à la base des valeurs aléatoire envoyés 
-# 0 : Feu doit être Rouge
-# 1 : Feu doit être Orange
-# 2 : Feu doit être Vert
+# 3 values can be sent to the broker for the traffic lights
+# 
+# 0 : Red light
+# 1 : Yellow light
+# 2 : Green light
+#
+# For topics we have zolertia with 2 variables roada et roadb.
+# It matches the two roads (RoadA and RoadB) of a crossroad explained in the wiki page
 #------------------------------------------------------------#
 ID_STRING      = "V0.1"
 #------------------------------------------------------------#
 MQTT_URL          = "things.ubidots.com"		# Url for accesing the Broker MQTT
 MQTT_PORT         = 1883						# MQTT port
-MQTT_KEEPALIVE    = 60
-MQTT_URL_PUB      = "/v1.6/devices/zolertia/" 	# publishing TOPIC
-MQTT_URL_TOPIC    = "/v1.6/devices/zolertia/#"	# subscribing TOPIC
+MQTT_KEEPALIVE    = 50
+MQTT_URL_PUB      = "/v1.6/devices/zolertia" 	# publishing TOPIC
+MQTT_URL_TOPIC    = "/v1.6/devices/zolertia/+/lv"	# subscribing TOPIC
 #------------------------------------------------------------#
 # Variables used
 #------------------------------------------------------------#
 var1 = "ADC1"
 var2 = "ADC2"
+var3 = "ADC3"
+var4 = "ADC4"
 #------------------------------------------------------------#
 HOST		= "aaaa::1"
 CLIENT		= "aaaa::212:4b00:616:f5f" # Matching the border router address fe80::212:4b00:60d:b3ef
@@ -42,7 +56,7 @@ BUFSIZE		= 4096
 EXAMPLE_WITH_Z1   = 0
 #------------------------------------------------------------#
 ENABLE_MQTT       = 1
-ENABLE_LOG        = 0
+ENABLE_LOG        = 1
 #------------------------------------------------------------#
 DEBUG_PRINT_JSON  = 1
 
@@ -56,11 +70,13 @@ SOCK = None
 class SENSOR(Structure):
 	_pack_   = 1
 		# Structure Key/Value
-	_fields_ = 	[("id",c_uint16),	
-			("counter",c_uint8),
+	_fields_ = 	[("id",c_uint8),
+			("counter",c_uint16),
 			(var1,c_uint16),
-			(var2,c_uint8),
-			("battery",c_uint8)]
+			(var2,c_uint16),
+			(var3,c_uint16),
+			(var4,c_uint16),
+			("battery",c_uint16)]
 
 	def __new__(self, socket_buffer):
         	return self.from_buffer_copy(socket_buffer)
@@ -69,8 +85,10 @@ class SENSOR(Structure):
         	pass
 
 #routes_dict = {}
-routes_dict = {'feu1': {'aaaa::212:4b00:60d:b318': '0', 'aaaa::212:4b00:60d:b288': '0'}, 'feu2': {'aaaa::212:4b00:60d:b41c': '2', 'aaaa::212:4b00:60d:b374': '2'}, 'feu3': {}}
-trafficlight_state = {"feu1": 0, "feu2": 2}
+routes_dict = {'roada': {'aaaa::212:4b00:60d:b318': '0', 'aaaa::212:4b00:60d:b288': '0'}, 'roadb': {'aaaa::212:4b00:60d:b41c': '2', 'aaaa::212:4b00:60d:b374': '2'}, 'feu3': {}, 'sensorRoad1': {}, 'sensorRoad2': {}} #Just for testing, automatically add new addresses and topics
+trafficlight_state = {"roada": 0, "roadb": 2}
+trafficlight_state_conf = {"roada":  False, "roadb": False}
+
 
 #------------------------------------------------------------#
 # Export expected values from messages
@@ -85,19 +103,28 @@ def jsonify_recv_data(msg, no_str=None):		# Get traffic light state from message
 		return sensordata
 	return str(sensordata)
 # -----------------------------------------------------------#
-def jsonify_recv_QOS(msg):		# Get QoS from message
+def jsonify_recv_QOS(msg):						# Get QoS from message
 	for f_name, f_type in msg._fields_:
-		if f_name =="battery":	# Get expected value
+		if f_name =="ADC3":	# Get expected value
 			QOS=getattr(msg, f_name)		
 	return str(QOS)
+
+def jsonify_recv_conf(msg, no_str=None):		# Get traffic light state from message
+	for f_name, f_type in msg._fields_:
+		if f_name =="ADC4":	# Get expected value
+			if getattr(msg, f_name) != "0":
+				value=getattr(msg, f_name) 	
+			CONFIRMATION=value
+	if no_str:
+		return int(CONFIRMATION)
+	return str(CONFIRMATION)
 # -----------------------------------------------------------#
 # Sender fonction to test modules
 # -----------------------------------------------------------#
 def send_udp_cmd(msg=None):		
-	print "Sending reply to my test" + CLIENT
+	# print "Sending reply to my test" + CLIENT
 	try:
-		print "id", msg.id, "counter", msg.counter, "ADC1", jsonify_recv_data(msg, True), "ADC2", jsonify_recv_QOS(msg) 
-		#my_msg = struct.pack("IIIII", msg.id, msg.counter, int(jsonify_recv_data(msg)), int(jsonify_recv_QOS(msg)), 0)
+		# print "id", msg.id, "counter", msg.counter, "ADC1", jsonify_recv_data(msg), "ADC2", jsonify_recv_QOS(msg)
 		my_msg = struct.pack("III", int(jsonify_recv_data(msg)), int(jsonify_recv_QOS(msg)), 0)
 		
 		SOCK.sendto(my_msg, (CLIENT, CMD_PORT))
@@ -109,24 +136,24 @@ def update_trafficlights_cmd(var, urgent=None):
 	if var not in routes_dict:
 		routes_dict[var] = {}
 	print routes_dict[var].keys()
-	if var == "all":
-		db = [routes_dict[c].keys() for c in routes_dict]
+	if var == "all": # All clients from every traffic topics
+		db = [routes_dict[c].keys() for c in routes_dict] # TO DO
 		print db
-	else:
+	else: # clients from a specific topic
 		db = routes_dict[var].keys()
 	for client in db:
-		print "Sending reply to " + client
+		# print "Sending reply to " + client
 		try:
 			data = trafficlight_state[var]
-			#print (client, CMD_PORT)
 			if urgent:
-				print "PinPom"
 				qos = 2
 			else:
 				qos = 0
-			print "Data sent : ",data,"Qos :",qos
-			my_msg = struct.pack("III", int(data), qos, 0)
+			# print "Data sent : ",data,"Qos :",qos
+			my_msg = struct.pack("III", int(data), qos, 1)
 			SOCK.sendto(my_msg, (client, CMD_PORT))
+
+			#Put his confirmation on a queue + add in the message a specific id in order to retreive it 
 			
 		except Exception as error:
 			print error
@@ -146,32 +173,36 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 	try:
 		# Select which traffic light sent something
 		if pubid == 1:
-			TOPIC="feu1"
+			TOPIC = "roada"
 		if pubid == 2:
-			TOPIC="feu2"
+			TOPIC = "roadb"
 		if pubid == 3:
-			TOPIC="feu1"
+			TOPIC = "roada"
 		if pubid == 4:
-			TOPIC="feu2"
-		if pubid < 1 or pubid > 4:
+			TOPIC = "roadb"
+		if pubid == 5:
+			TOPIC = "sensorRoad1"
+		if pubid == 6:
+			TOPIC = "sensorRoad2"
+		if pubid <1 and pubid > 6 :
 			print "ID no recognized"
-		print
-		print "Data receiv : ", data, "by trafficlight : ", pubid
-		print
+
+		if pubid == 3:
+			QOS = 1
+		else:
+			QOS = 0
+		# print
+		print "Data received : ", data, "by trafficlight : ", pubid, "addr : ",addr, "QoS : ",QOS
+		# print
+
+		if TOPIC not in routes_dict:
+			# print "Creation of "+TOPIC
+			routes_dict[TOPIC] = {}
 
 		if addr not in routes_dict[TOPIC]:
-			#print "Collecting client address"
-			# lightid = int(pubid)%2 # To edit
-			# if lightid == 0:
-			# 	lightid = 2
-			# strid = "feu"+str(lightid)
-			# print strid, lightid
-			if (TOPIC) not in routes_dict:
-				#print "Creation of "+TOPIC
-				routes_dict[TOPIC] = {}
+			# print "Collecting client address"
 			routes_dict[TOPIC][addr] = data
-			#print "Import finished"
-			print str(routes_dict)
+			# print str(routes_dict)
 
 		if QOS == '2':
 			print
@@ -185,56 +216,53 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			print
 			print "Data directly sent to Ubidots without verification"
 			print
+		
 
-		if (pubid == 1) and data == "2": # trafficlight 1 goes to green
-			#conn.publish.multiple(msgs, hostname=MQTT_URL)
+		payload = json.dumps({"battery": 12, "uptime": 1033, "trafficlight": data, "id": pubid})
+		conn.publish("/v1.6/devices/007d"+addr[-4:], payload, qos=int(QOS))
 
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload="1", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + "1" + " and QoS : "+QOS
-			time.sleep(3)
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload="0", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + "0" + " and QoS : "+QOS
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload=data, qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + data + " and QoS : "+QOS
+		# time.sleep(0.8)
 
-		if (pubid == 2) and data == "2": # trafficlight 2 goes to green
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload="1", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + "1" + " and QoS : "+QOS
-			time.sleep(3)
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload="0", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + "0" + " and QoS : "+QOS
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload=data, qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
+		
 
+		if (pubid == 5) or ((pubid == 1) and data == "2" and trafficlight_state[TOPIC] != data): # trafficlight 1 goes to green
+
+			payload = json.dumps({"roada": data, "roadb": 0})
+			# print payload
+			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
+
+		if (pubid == 6) or ((pubid == 2) and data == "2" and trafficlight_state[TOPIC] != data): # trafficlight 2 goes to green
+
+			payload = json.dumps({"roada": 0, "roadb": data})
+			# print payload
+			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
 
-		if (pubid == 2) and data == "0": # trafficlight 2 goes to red
-			#conn.publish.multiple(msgs, hostname=MQTT_URL)
 
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload="1", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + "1" + " and QoS : "+QOS
-			time.sleep(3)
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload=data, qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload="2", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + "2" + " and QoS : "+QOS
+		if (pubid == 2) and data == "0" and trafficlight_state[TOPIC] != data: # trafficlight 2 goes to red
 
-		if (pubid == 1) and data == "0": # trafficlight 1 goes to red
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload="1", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + "1" + " and QoS : "+QOS
-			time.sleep(3)
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload=data, qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + data + " and QoS : "+QOS
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload="2", qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + "2" + " and QoS : "+QOS
+			payload = json.dumps({"roada": 2, "roadb": data})
+			# print payload
+			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
+
+		if (pubid == 1) and data == "0" and trafficlight_state[TOPIC] != data: # trafficlight 1 goes to red
+
+			payload = json.dumps({"roada": data, "roadb": 2})
+			# print payload
+			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 			
 			
 		if data == "1" and (pubid < 3):
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload=data, qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + data + " and QoS : "+QOS
-			res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload=data, qos=int(QOS))
-			print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
+
+			payload = json.dumps({"roada": data, "roadb": data})
+			# print payload
+			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
+
+		# time.sleep(0.8)
 		print("Data sent to server")
+		if QOS in [1, 2]:
+			print "sleep"
+			time.sleep(0.8) # time to send the message without perturbation
 		
 	except Exception as error:
 		print error
@@ -245,22 +273,31 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 def on_connect(client, userdata, flags, rc):
 	print("Connected with result code "+str(rc))
 	print("Subscribed to " + MQTT_URL_TOPIC)
-	client.subscribe(MQTT_URL_TOPIC)
+	client.subscribe(MQTT_URL_TOPIC, 2) # 2nd arg is the QoS level to use at maximum when it's needed
 	#print("usrData: "+str(userdata))
 	#print("client: " +str(client))
 	#print("flags: " +str(flags))
 #------------------------------------------------------------#
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-	#print ("Published message from server ")
-	#print(msg.topic + " " + str(msg.payload) + ", qos: " + str(msg.qos))
+	print ("Published message from server ")
+	now = datetime.datetime.now()
+	print "End point : "+ str(now)
+	print(msg.topic + " " + str(msg.payload) + ", QoS: " + str(msg.qos))
 	if(msg.payload[0] != "{"):
 		var = str(msg.topic.split('/',5)[4])
-		#print "Update required", "payload :",msg.payload, var
-		trafficlight_state[var] = msg.payload
-		#print trafficlight_state
-		update_trafficlights_cmd(var)
+		# if(var != "feu3" and trafficlight_state[var] != msg.payload ): # Update valid and needed
+		if(trafficlight_state[var] != msg.payload ): # Update valid and needed
+			trafficlight_state[var] = msg.payload
+			update_trafficlights_cmd(var)
+	print "-----------------------------------------------------------"
 
+def on_log(client, userdata, msg, buffer):
+	print buffer
+
+def on_publish(client, userdata, result):
+	print "Published!", result
+	print
 
 #------------------------------------------------------------#
 # Main function
@@ -303,8 +340,10 @@ def start_client():
 		# Allow connexion to the broker
 		client.on_connect = on_connect
 		# Set your Ubidots default token
-		client.username_pw_set("A1E-Zdfehlc7EmA9JEer6YIARbtHIMK1y8", "") #A1E-dEzBw6HHcOgRUz22KIwvuYkfvmfixy
+		client.username_pw_set("A1E-rnSeKf6ZnttxdT4d2aXmpU45Eyrzst", "") #A1E-dEzBw6HHcOgRUz22KIwvuYkfvmfixy
 		client.on_message = on_message
+		client.on_log = on_log
+		client.on_publish = on_publish
 
 		try:
 			client.connect(MQTT_URL, MQTT_PORT, MQTT_KEEPALIVE)
@@ -322,7 +361,7 @@ def start_client():
 		print >>sys.stderr, '\nwaiting to receive message from sensor'
 		data, addr = SOCK.recvfrom(BUFSIZE)
 		now = datetime.datetime.now()
-		#print str(now)[:19] + " -> " + str(addr[0]) + ":" + str(addr[1]) + " " + str(len(data))
+		# print str(now) + " -> " + str(addr[0]) + ":" + str(addr[1]) + " " + str(len(data))
 		msg_recv = SENSOR(data)
 		
 		if ENABLE_LOG:
@@ -333,15 +372,14 @@ def start_client():
 		QOS = jsonify_recv_QOS(msg_recv)
 
 		if ENABLE_MQTT:
+			print "Input : "+ str(now)
 			publish_recv_data(sensordata, msg_recv.id, client, addr[0],QOS)
 
-		print routes_dict
-
-		# if QOS == "2":
-		# 	print "QOS 2 --------"
-		# 	update_trafficlights_cmd("all", True)
-		# else:
-		# 	print "QOS = ", QOS
+		if QOS == "2":
+			print "QOS 2 --------"
+			# TO DO send all
+			update_trafficlights_cmd("roada", True)
+			update_trafficlights_cmd("roadb", True)
 
 
 #------------------------------------------------------------#

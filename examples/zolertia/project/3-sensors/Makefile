@@ -1,12 +1,6 @@
 DEFINES+=PROJECT_CONF_H=\"project-conf.h\"
 
-CONTIKI_PROJECT = zoul-demo zoulmate-demo zoulmate-touch test-tsl256x test-sht25 test-servo.c
-CONTIKI_PROJECT += test-bmp085-bmp180 test-motion test-rotation-sensor
-CONTIKI_PROJECT += test-grove-light-sensor test-grove-loudness-sensor
-CONTIKI_PROJECT += test-weather-meter test-grove-gyro test-lcd test-iaq
-CONTIKI_PROJECT += test-pm10-sensor test-vac-sensor test-aac-sensor
-CONTIKI_PROJECT += test-zonik test-dht22.c test-ac-dimmer.c test-servo.c
-CONTIKI_PROJECT += test-bme280
+CONTIKI_PROJECT = touch-sensor
 
 CONTIKI_TARGET_SOURCEFILES += tsl256x.c sht25.c bmpx8x.c motion-sensor.c
 CONTIKI_TARGET_SOURCEFILES += adc-sensors.c weather-meter.c grove-gyro.c

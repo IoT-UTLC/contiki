@@ -1,4 +1,4 @@
-all: trafficlight-control trafficlight-control-slave pre-control
+all: trafficlight-control trafficlight-control-slave
 
 # Linker optimizations
 SMALL = 1

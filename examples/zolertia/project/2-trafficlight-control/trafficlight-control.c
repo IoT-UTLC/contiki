@@ -27,6 +27,12 @@
  * SUCH DAMAGE.
  *
  * This file is part of the Contiki operating system.
+ * 
+ * -----------------------------------------------------------------
+ * 
+ * Traffic lights developement for IoT-UTLC project by Jérémy Petit
+ * jeremy.petit2@outlook.fr
+ * and 6 ECE Paris students
  *
  */
 /*---------------------------------------------------------------------------*/
@@ -85,6 +91,8 @@ static int RESET = 0;
 static int PAUSE = 0;
 
 static int TT = 0;
+
+static int ND = 0;
 
 static struct etimer periodic;
 
@@ -160,14 +168,9 @@ tcpip_handler(void)
     rcv = uip_appdata;
     printf("Test des valeurs : data:%u qos:%u option:%u\n", rcv->data, rcv->qos, rcv->option);
 
-    printf("My state %u \n", my_state);
-
     if (my_state != rcv->data) /* New state */
     {
       printf("New value %u != %u \n", my_state, rcv->data);
-      if(rcv->data == msg.value1){
-        printf("WANTED \n");
-      }
 
       if (rcv->data == 0)
       {
@@ -176,31 +179,13 @@ tcpip_handler(void)
       }
       printf("Data given: %u \n", rcv->data);
       PAUSE = 1;
-      state_trafficlight(rcv->data);
       my_state = rcv->data;
-
-      printf("HELLO WANT TO TALK\n");
-
-      // rtimer_clock_t latency;
-
-      // #if TIMESYNCH_CONF_ENABLED
-      //   latency = timesynch_time() - msg_lat_recv.timestamp;
-      // #else
-      //   latency = 0;
-      // #endif
-
-      // PRINTF("Latency : %lu ms", (1000L * latency) / RTIMER_ARCH_SECOND);
-
-      //Here
-
-
     }
     else
     {
       printf("%u == %u \n", my_state, rcv->data);
     }
     if (rcv->option) {
-        printf("Time to confirm\n");
         // Send confirmation of the new state
         msg.id = 0x1;
         msg.counter = counter;
@@ -225,13 +210,13 @@ tcpip_handler(void)
 
     }
     if (rcv->qos == 2) { /* if QOS = 2 new state is not a classic cycle and timer need to be reset */
+      printf("Reset\n");
       RESET = 1;
-      printf("Got Reset qos 2 \n");
     }
     if (rcv->data > 2000 && rcv->qos > 200 && rcv->option > 200)
     { //Buffer overflow detected
       wrong_data_ctr++;
-      printf("wrong\n");
+      printf("Wrong data, possible overflow\n");
       if (wrong_data_ctr > 10)
         sys_ctrl_reset();
     }
@@ -256,7 +241,6 @@ send_packet_event(void)
 
   aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
   msg.battery = (uint16_t)aux;
-  // msg.confirmation = 0x0;
 
   /* Print the sensor data */
   printf("ID: %u, Counter : %u, Value: %d, QoS: %d, Conf: %d, batt: %u\n",
@@ -272,13 +256,6 @@ send_packet_event(void)
 
   PRINTF("Send readings to %u'\n",
          server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
-  PRINTF("Timestamp initiated\n");
-
-  // #if TIMESYNCH_CONF_ENABLED
-  //     msg_lat->timestamp = timesynch_time();
-  // #else
-  //     msg_lat->timestamp = 0;
-  // #endif
 
   uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
@@ -299,12 +276,11 @@ send_packet_sensor(void)
     msg.value1 = 2;
   else
     msg.value1 = 0;
-  msg.value2 = 2; /* Set QoS */
+  msg.value2 = 1; /* Set QoS */
   msg.value3 = 1; /* Set Confirmation */
 
   aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
   msg.battery = (uint16_t)aux;
-  // msg.confirmation = 0x0;
 
   /* Print the sensor data */
   printf("ID: %u, Counter : %u, Value: %d, QoS: %d, Conf: %d, batt: %u\n",
@@ -320,13 +296,6 @@ send_packet_sensor(void)
 
   PRINTF("Send readings to %u'\n",
          server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
-  PRINTF("Timestamp initiated\n");
-
-  // #if TIMESYNCH_CONF_ENABLED
-  //     msg_lat->timestamp = timesynch_time();
-  // #else
-  //     msg_lat->timestamp = 0;
-  // #endif
 
   uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
@@ -442,14 +411,10 @@ PROCESS_THREAD(udp_client_process, ev, data)
   PRINTF(" local/remote port %u/%u\n", UIP_HTONS(client_conn->lport),
          UIP_HTONS(client_conn->rport));
 
-  /* For FEU2 */
+  /* For ROADB */
   // etimer_set(&tima, 30 * CLOCK_SECOND);
   // PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tima));
 
-  /*
-  uip_udp_packet_sendto(client_conn, "Hello", strlen("Hello"),
-                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-  */
   etimer_set(&periodic, SEND_INTERVAL);
 
   while (1)
@@ -464,14 +429,14 @@ PROCESS_THREAD(udp_client_process, ev, data)
     i = i + 1;
     if (RESET)
     {
-      printf("RESET !! %u\n", RESET);
+      printf("RESET");
       if (msg.id == 1) { /* Reset time for trafficlight 1 cycle of 30s */
         etimer_set(&periodic, SEND_INTERVAL / 2);
-        printf("RESET feu1");
+        ND=1;
+        
       }
       else { /* Trafficlight 2 cycle of 1 min for 30s shift between the 2 */
         etimer_set(&periodic, SEND_INTERVAL);
-        printf("RESET feu2");
       }
       RESET = 0;
     }
@@ -483,21 +448,23 @@ PROCESS_THREAD(udp_client_process, ev, data)
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tim));
       PAUSE = 0;
       TT = 1;
+      state_trafficlight(my_state);
     }
     /* Send data to the server */
     /* QoS 0: Non-priority data sent every minutes with 30s shift for data sent to server every 30s */
     if (ev == PROCESS_EVENT_TIMER)
     {
-      if(PAUSE==1 || TT == 1){
-        printf("I've got PAUSE\n");
+      if(PAUSE==1 || TT == 1){ // Verification to avoid time conflict using PAUSE
         PAUSE=0;
         TT=0;
       }else {
-        printf("Get to PROCESS_EVENT_TIMER\n");
         send_packet_event();
         if (etimer_expired(&periodic))
         {
-          etimer_reset(&periodic);
+          if(ND == 1) //To get back the normal interval
+            etimer_set(&periodic, SEND_INTERVAL);
+          else
+            etimer_reset(&periodic);
         }
       }
     }

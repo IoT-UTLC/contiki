@@ -89,8 +89,6 @@ static int TT = 0;
 static struct etimer periodic;
 
 static struct etimer tim;
-
-static struct etimer tima;
 /*---------------------------------------------------------------------------*/
 /* Create a structure and pointer to store the data to be sent as payload */
 static struct my_msg_t msg;
@@ -160,14 +158,9 @@ tcpip_handler(void)
     rcv = uip_appdata;
     printf("Test des valeurs : data:%u qos:%u option:%u\n", rcv->data, rcv->qos, rcv->option);
 
-    printf("My state %u \n", my_state);
-
     if (my_state != rcv->data) /* New state */
     {
       printf("New value %u != %u \n", my_state, rcv->data);
-      if(rcv->data == msg.value1){
-        printf("WANTED \n");
-      }
 
       if (rcv->data == 0)
       {
@@ -176,23 +169,7 @@ tcpip_handler(void)
       }
       printf("Data given: %u \n", rcv->data);
       PAUSE = 1;
-      state_trafficlight(rcv->data);
       my_state = rcv->data;
-
-      printf("HELLO WANT TO TALK\n");
-
-      // rtimer_clock_t latency;
-
-      // #if TIMESYNCH_CONF_ENABLED
-      //   latency = timesynch_time() - msg_lat_recv.timestamp;
-      // #else
-      //   latency = 0;
-      // #endif
-
-      // PRINTF("Latency : %lu ms", (1000L * latency) / RTIMER_ARCH_SECOND);
-
-      //Here
-
 
     }
     else
@@ -200,9 +177,8 @@ tcpip_handler(void)
       printf("%u == %u \n", my_state, rcv->data);
     }
     if (rcv->option) {
-        printf("Time to confirm\n");
         // Send confirmation of the new state
-        msg.id = 0x3;
+        msg.id = 0x4;
         msg.counter = counter;
         msg.value1 = my_state;
         msg.value2 = 1; /* Set QoS */
@@ -224,15 +200,10 @@ tcpip_handler(void)
         msg.value1 = tmpval;
 
     }
-    
-    // if (rcv->qos == 2) { /* if QOS = 2 new state is not a classic cycle and timer need to be reset */
-    //   RESET = 1;
-    //   printf("Got Reset qos 2 \n");
-    // }
     if (rcv->data > 2000 && rcv->qos > 200 && rcv->option > 200)
     { //Buffer overflow detected
       wrong_data_ctr++;
-      printf("wrong\n");
+      printf("Wwong data, possible overflow\n");
       if (wrong_data_ctr > 10)
         sys_ctrl_reset();
     }
@@ -246,13 +217,13 @@ send_packet_event(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x3; /* Set traffic light/sensor ID */
+  msg.id = 0x4; /* Set traffic light/sensor ID */
   msg.counter = counter;
   // if (my_state == 0)  /* Set traffic light state */
   //   msg.value1 = 2;
   // else
   //   msg.value1 = 0;
-  msg.value1 = 8;
+  msg.value1 = 42;
   msg.value2 = 0; /* Set QoS */
   msg.value3 = 0; /* Set Confirmation */
 
@@ -274,13 +245,6 @@ send_packet_event(void)
 
   PRINTF("Send readings to %u'\n",
          server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
-  PRINTF("Timestamp initiated\n");
-
-  // #if TIMESYNCH_CONF_ENABLED
-  //     msg_lat->timestamp = timesynch_time();
-  // #else
-  //     msg_lat->timestamp = 0;
-  // #endif
 
   uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
@@ -295,14 +259,14 @@ send_packet_sensor(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x3; /* Set traffic light/sensor ID */
+  msg.id = 0x4; /* Set traffic light/sensor ID */
   msg.counter = counter;
   // if (my_state == 0)  /* Set traffic light state */
   //   msg.value1 = 2;
   // else
   //   msg.value1 = 0;
-  msg.value1 = 8;
-  msg.value2 = 2; /* Set QoS */
+  msg.value1 = 42;
+  msg.value2 = 1; /* Set QoS */
   msg.value3 = 1; /* Set Confirmation */
 
   aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
@@ -323,13 +287,6 @@ send_packet_sensor(void)
 
   PRINTF("Send readings to %u'\n",
          server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
-  PRINTF("Timestamp initiated\n");
-
-  // #if TIMESYNCH_CONF_ENABLED
-  //     msg_lat->timestamp = timesynch_time();
-  // #else
-  //     msg_lat->timestamp = 0;
-  // #endif
 
   uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
@@ -420,8 +377,8 @@ PROCESS_THREAD(udp_client_process, ev, data)
 #endif
 
   SENSORS_ACTIVATE(button_sensor);
-  leds_on(LEDS_RED); //Traffic lights 2 & 4 start at green, 1 & 3 at red
-  my_state = 0;
+  leds_on(LEDS_GREEN); //Traffic lights 2 & 4 start at green, 1 & 3 at red
+  my_state = 2;
 
   /* Create a new connection with remote host.  When a connection is created
    * with udp_new(), it gets a local port number assigned automatically.
@@ -445,15 +402,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
   PRINTF(" local/remote port %u/%u\n", UIP_HTONS(client_conn->lport),
          UIP_HTONS(client_conn->rport));
 
-  /* For FEU2 */
-  // etimer_set(&tima, 30 * CLOCK_SECOND);
-  // PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tima));
-
-  /*
-  uip_udp_packet_sendto(client_conn, "Hello", strlen("Hello"),
-                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-  */
-  etimer_set(&periodic, SEND_INTERVAL);
+  //etimer_set(&periodic, SEND_INTERVAL);
 
   while (1)
   {
@@ -465,19 +414,6 @@ PROCESS_THREAD(udp_client_process, ev, data)
       tcpip_handler();
     }
     i = i + 1;
-    // if (RESET)
-    // {
-    //   printf("RESET !! %u\n", RESET);
-    //   if (msg.id == 1) { /* Reset time for trafficlight 1 cycle of 30s */
-    //     etimer_set(&periodic, SEND_INTERVAL / 2);
-    //     printf("RESET feu1");
-    //   }
-    //   else { /* Trafficlight 2 cycle of 1 min for 30s shift between the 2 */
-    //     etimer_set(&periodic, SEND_INTERVAL);
-    //     printf("RESET feu2");
-    //   }
-    //   RESET = 0;
-    // }
 
     if (PAUSE)
     {
@@ -485,25 +421,18 @@ PROCESS_THREAD(udp_client_process, ev, data)
       etimer_set(&tim, 3 * CLOCK_SECOND);
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tim));
       PAUSE = 0;
-      //TT = 1;
+      TT = 1;
+      state_trafficlight(my_state);
     }
     /* Send data to the server */
     /* QoS 0: Non-priority data sent every minutes with 30s shift for data sent to server every 30s */
-    // if (ev == PROCESS_EVENT_TIMER)
-    // {
-    //   if(PAUSE==1 || TT == 1){
-    //     printf("I've got PAUSE\n");
-    //     PAUSE=0;
-    //     TT=0;
-    //   }else {
-    //     printf("Get to PROCESS_EVENT_TIMER\n");
-    //     send_packet_event();
-    //     if (etimer_expired(&periodic))
-    //     {
-    //       etimer_reset(&periodic);
-    //     }
-    //   }
-    // }
+    if (ev == PROCESS_EVENT_TIMER)
+    {
+      if(PAUSE==1 || TT == 1){
+        PAUSE=0;
+        TT=0;
+      }
+    }
 
     /* QoS 2: Priority data when pressing the user button */
     if (ev == sensors_event && data == &button_sensor)

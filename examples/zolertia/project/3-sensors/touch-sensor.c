@@ -62,6 +62,13 @@
  *
  * \file
  *     Example demonstrating the Zoul module on the RE-Mote & Firefly platforms
+ * 
+ * * -----------------------------------------------------------------
+ * 
+ * Touch sensor developement for IoT-UTLC project by Jérémy Petit
+ * jeremy.petit2@outlook.fr
+ * and ECE Paris students
+ *
  */
 /*---------------------------------------------------------------------------*/
 #include "contiki.h"
@@ -117,8 +124,8 @@ static uint16_t counter = 0;
 static struct my_msg_t msg;
 static struct my_msg_t *msgPtr = &msg;
 /*---------------------------------------------------------------------------*/
-PROCESS(zoulmate_demo_process, "Zoulmate Touch process");
-AUTOSTART_PROCESSES(&zoulmate_demo_process);
+PROCESS(touch_sensor_process, "Touch Sensor process");
+AUTOSTART_PROCESSES(&touch_sensor_process);
 /*---------------------------------------------------------------------------*/
 static void
 send_packet_sensor(void)
@@ -130,7 +137,7 @@ send_packet_sensor(void)
   msg.counter = counter;
   msg.value1 = 2; /* Set traffic light state */
   msg.value2 = 2; /* Set QoS */
-  msg.value3 = 0; /* Set QoS */
+  msg.value3 = 0; /* Set Confirmation */
 
   aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
   msg.battery = (uint16_t)aux;
@@ -155,7 +162,7 @@ send_packet_sensor(void)
 
 /*---------------------------------------------------------------------------*/
 
-PROCESS_THREAD(zoulmate_demo_process, ev, data)
+PROCESS_THREAD(touch_sensor_process, ev, data)
 {
 
   PROCESS_BEGIN();
@@ -173,7 +180,7 @@ PROCESS_THREAD(zoulmate_demo_process, ev, data)
   /* Configure the ADC ports */
   adc_zoul.configure(SENSORS_HW_INIT, ZOUL_SENSORS_ADC_ALL);
 
-  printf("Zoulmate test application\n");
+  printf("Touch Sensor application\n");
 
   client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL);
 
@@ -202,7 +209,6 @@ PROCESS_THREAD(zoulmate_demo_process, ev, data)
     {
       /* For quick debugging*/
       printf("Value: %u\n", adc_zoul.value(ZOUL_SENSORS_ADC1));
-      //printf("Value2: %u\n", adc_zoul.value(ZOUL_SENSORS_ADC2));
       /* If a touch is detected */
       if (adc_zoul.value(ZOUL_SENSORS_ADC1) > 20000)
       {
@@ -215,7 +221,11 @@ PROCESS_THREAD(zoulmate_demo_process, ev, data)
 
         /* Put a hold to avoid repetitive pushing */
         // Pause for 10 seconds
+        leds_off(LEDS_ALL);
+        leds_on(LEDS_BLUE);
+        
         printf("Pause\n");
+
         etimer_set(&tim, 10 * CLOCK_SECOND);
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tim));
       }
