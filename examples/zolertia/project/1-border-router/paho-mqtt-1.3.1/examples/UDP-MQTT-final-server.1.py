@@ -77,6 +77,8 @@ routes_dict = {'feu1': {'aaaa::212:4b00:60d:b318': '0', 'aaaa::212:4b00:60d:b288
 trafficlight_state = {"feu1": 0, "feu2": 2}
 trafficlight_state_conf = {"feu1":  False, "feu2": False}
 
+SDATA = 3
+
 
 #------------------------------------------------------------#
 # Export expected values from messages
@@ -158,6 +160,7 @@ def print_recv_data(msg):
 # Publish to MQTT Broker
 # -----------------------------------------------------------#
 def publish_recv_data(data, pubid, conn, addr,QOS):
+	global SDATA
 	try:
 		# Select which traffic light sent something
 		if pubid == 1:
@@ -210,7 +213,9 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 		# conn.publish("/v1.6/devices/007d"+addr[-4:], payload, qos=int(QOS))
 
 		# time.sleep(0.8)
+		QOS = 1
 
+		print "SDATA = ", SDATA
 		
 
 		if (pubid == 5) or ((pubid == 1) and data == "2" and trafficlight_state[TOPIC] != data): # trafficlight 1 goes to green
@@ -222,7 +227,7 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + data + " and QoS : "+QOS
 
 			#payload = json.dumps({"feu1": data, "feu2": 0})
-			payload = json.dumps({"feu1": data})
+			payload = json.dumps({"feu1": SDATA})
 			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
@@ -234,7 +239,7 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
 
 			#payload = json.dumps({"feu1": 0, "feu2": data})
-			payload = json.dumps({"feu1": 0})
+			payload = json.dumps({"feu1": SDATA})
 			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
@@ -248,7 +253,7 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			# res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload="2", qos=int(QOS))
 			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + "2" + " and QoS : "+QOS
 			#payload = json.dumps({"feu1": 2, "feu2": data})
-			payload = json.dumps({"feu1": 2})
+			payload = json.dumps({"feu1": SDATA})
 			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
@@ -259,7 +264,7 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			# # res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload="2", qos=int(QOS))
 			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + "2" + " and QoS : "+QOS
 			#payload = json.dumps({"feu1": data, "feu2": 2})
-			payload = json.dumps({"feu1": data})
+			payload = json.dumps({"feu1": SDATA})
 			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 			
@@ -271,15 +276,17 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			# res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload=data, qos=int(QOS))
 			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
 			#payload = json.dumps({"feu1": data, "feu2": data})
-			payload = json.dumps({"feu1": data})
+			payload = json.dumps({"feu1": SDATA})
 			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
+		SDATA = SDATA + 1
+
 		# time.sleep(0.8)
 		print("Data sent to server")
-		if QOS in [1, 2]:
-			print "sleep"
-			time.sleep(0.8) # time to send the message without perturbation
+		# if QOS in [1, 2]:
+		# 	print "sleep"
+		# 	time.sleep(0.8) # time to send the message without perturbation
 		
 	except Exception as error:
 		print error
@@ -290,7 +297,7 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 def on_connect(client, userdata, flags, rc):
 	print("Connected with result code "+str(rc))
 	print("Subscribed to " + MQTT_URL_TOPIC)
-	client.subscribe(MQTT_URL_TOPIC, 2) # 2nd arg is the QoS level to use at maximum when it's needed
+	client.subscribe(MQTT_URL_TOPIC, 1) # 2nd arg is the QoS level to use at maximum when it's needed
 	#print("usrData: "+str(userdata))
 	#print("client: " +str(client))
 	#print("flags: " +str(flags))
@@ -399,7 +406,7 @@ def start_client():
 
 			if ENABLE_MQTT:
 				print "Input : "+ str(now)
-				publish_recv_data(sensordata, msg_recv.id, client, addr[0],QOS)
+				#publish_recv_data(sensordata, msg_recv.id, client, addr[0],QOS)
 
 			# print routes_dict
 

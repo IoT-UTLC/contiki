@@ -27,6 +27,12 @@
  * SUCH DAMAGE.
  *
  * This file is part of the Contiki operating system.
+ * 
+ * -----------------------------------------------------------------
+ * 
+ * Traffic lights developement for IoT-UTLC project by Jérémy Petit
+ * jeremy.petit2@outlook.fr
+ * and 6 ECE Paris students
  *
  */
 /*---------------------------------------------------------------------------*/
@@ -60,7 +66,6 @@
 /*---------------------------------------------------------------------------*/
 /* Default is to send a packet every 60 seconds */
 #define SEND_INTERVAL (60 * CLOCK_SECOND)
-static struct etimer tim;
 /*---------------------------------------------------------------------------*/
 /* Variable used to send only once with user button*/
 int i = 0;
@@ -85,7 +90,15 @@ static int RESET = 0;
 /* Flag to pause Re-mote etimer */
 static int PAUSE = 0;
 
+static int TT = 0;
+
+static int ND = 0;
+
 static struct etimer periodic;
+
+static struct etimer tim;
+
+static struct etimer tima;
 /*---------------------------------------------------------------------------*/
 /* Create a structure and pointer to store the data to be sent as payload */
 static struct my_msg_t msg;
@@ -100,6 +113,14 @@ typedef struct
 
 /* Create a structure to store the data received */
 static MSG_RCV *rcv;
+
+struct latency_structure{ // Structure to save the time when the message was send
+ 
+   rtimer_clock_t timestamp;// Time when the message was send
+ 
+};
+
+struct latency_structure *msg_lat;
 /*---------------------------------------------------------------------------*/
 PROCESS(udp_client_process, "Trafficlight control process");
 AUTOSTART_PROCESSES(&udp_client_process);
@@ -133,7 +154,7 @@ state_trafficlight(int value)
 
 /*---------------------------------------------------------------------------*/
 /* Whenever we receive a packet from another node (or the server), this callback
- * is invoked.  We use the "uip_newdata()" to check if there is actually data for
+ * is invoked.  We use the "uip_newdata()" to check if there is data for
  * us
  */
 static void
@@ -147,8 +168,6 @@ tcpip_handler(void)
     rcv = uip_appdata;
     printf("Test des valeurs : data:%u qos:%u option:%u\n", rcv->data, rcv->qos, rcv->option);
 
-    printf("My state %u \n", my_state);
-
     if (my_state != rcv->data) /* New state */
     {
       printf("New value %u != %u \n", my_state, rcv->data);
@@ -156,22 +175,48 @@ tcpip_handler(void)
       if (rcv->data == 0)
       {
         state_trafficlight(1);
+        printf("Switch to yellow \n");
       }
       printf("Data given: %u \n", rcv->data);
       PAUSE = 1;
-      state_trafficlight(rcv->data);
       my_state = rcv->data;
     }
     else
     {
       printf("%u == %u \n", my_state, rcv->data);
     }
-    if (rcv->qos == 2) /* if QOS = 2 new state is not a classic cycle and timer need to be reset */
+    if (rcv->option) {
+        // Send confirmation of the new state
+        msg.id = 0x1;
+        msg.counter = counter;
+        msg.value1 = my_state;
+        msg.value2 = 1; /* Set QoS */
+        msg.value3 = 1; /* Set Confirmation */
+
+        /* Convert to network byte order as expected by the UDP Server application */
+        uint16_t tmpval = msg.value1;
+        msg.counter = UIP_HTONS(msg.counter);
+        msg.value1 = UIP_HTONS(msg.value1);
+        msg.value2 = UIP_HTONS(msg.value2);
+        msg.value3 = UIP_HTONS(msg.value3);
+
+        PRINTF("Send readings to %u'\n",
+              server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
+
+        uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
+                              &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
+
+        msg.value1 = tmpval;
+
+    }
+    if (rcv->qos == 2) { /* if QOS = 2 new state is not a classic cycle and timer need to be reset */
+      printf("Reset\n");
       RESET = 1;
+    }
     if (rcv->data > 2000 && rcv->qos > 200 && rcv->option > 200)
     { //Buffer overflow detected
       wrong_data_ctr++;
-      printf("wrong\n");
+      printf("Wrong data, possible overflow\n");
       if (wrong_data_ctr > 10)
         sys_ctrl_reset();
     }
@@ -185,25 +230,28 @@ send_packet_event(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x3; /* Set traffic light/sensor ID */
+  msg.id = 0x1; /* Set traffic light/sensor ID */
   msg.counter = counter;
   if (my_state == 0)  /* Set traffic light state */
     msg.value1 = 2;
   else
     msg.value1 = 0;
   msg.value2 = 0; /* Set QoS */
+  msg.value3 = 0; /* Set Confirmation */
 
   aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
   msg.battery = (uint16_t)aux;
 
   /* Print the sensor data */
-  printf("ID: %u, Counter : %u, Value: %d, QoS: %d, batt: %u\n",
-         msg.id, msg.counter, msg.value1, msg.value2, msg.battery);
+  printf("ID: %u, Counter : %u, Value: %d, QoS: %d, Conf: %d, batt: %u\n",
+         msg.id, msg.counter, msg.value1, msg.value2, msg.value3, msg.battery);
 
   /* Convert to network byte order as expected by the UDP Server application */
   uint16_t tmpval = msg.value1;
   msg.counter = UIP_HTONS(msg.counter);
   msg.value1 = UIP_HTONS(msg.value1);
+  msg.value2 = UIP_HTONS(msg.value2);
+  msg.value3 = UIP_HTONS(msg.value3);
   msg.battery = UIP_HTONS(msg.battery);
 
   PRINTF("Send readings to %u'\n",
@@ -222,25 +270,28 @@ send_packet_sensor(void)
   uint16_t aux;
   counter++;
 
-  msg.id = 0x3; /* Set traffic light/sensor ID */
+  msg.id = 0x1; /* Set traffic light/sensor ID */
   msg.counter = counter;
   if (my_state == 0)  /* Set traffic light state */
     msg.value1 = 2;
   else
     msg.value1 = 0;
-  msg.value2 = 2; /* Set QoS */
+  msg.value2 = 1; /* Set QoS */
+  msg.value3 = 1; /* Set Confirmation */
 
   aux = vdd3_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED);
   msg.battery = (uint16_t)aux;
 
   /* Print the sensor data */
-  printf("ID: %u, Counter : %u, Value: %d, QoS: %d, batt: %u\n",
-         msg.id, msg.counter, msg.value1, msg.value2, msg.battery);
+  printf("ID: %u, Counter : %u, Value: %d, QoS: %d, Conf: %d, batt: %u\n",
+         msg.id, msg.counter, msg.value1, msg.value2, msg.value3, msg.battery);
 
   /* Convert to network byte order as expected by the UDP Server application */
   uint16_t tmpval = msg.value1;
   msg.counter = UIP_HTONS(msg.counter);
   msg.value1 = UIP_HTONS(msg.value1);
+  msg.value2 = UIP_HTONS(msg.value2);
+  msg.value3 = UIP_HTONS(msg.value3);
   msg.battery = UIP_HTONS(msg.battery);
 
   PRINTF("Send readings to %u'\n",
@@ -249,22 +300,8 @@ send_packet_sensor(void)
   uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 
-  /* Trick for the model purpose [Tests only] */
+  /* Trick for the model purpose */
   msg.value1 = tmpval;
-  printf("%u\n", my_state);
-
-  if (msg.value1 == 0)
-  {
-    state_trafficlight(1);
-    printf("Pause timer\n");
-    PAUSE = 1;
-    state_trafficlight(msg.value1);
-  }
-  else
-  {
-    my_state = msg.value1;
-    state_trafficlight(msg.value1);
-  }
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -374,10 +411,10 @@ PROCESS_THREAD(udp_client_process, ev, data)
   PRINTF(" local/remote port %u/%u\n", UIP_HTONS(client_conn->lport),
          UIP_HTONS(client_conn->rport));
 
-  /*
-  uip_udp_packet_sendto(client_conn, "Hello", strlen("Hello"),
-                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-  */
+  /* For ROADB */
+  // etimer_set(&tima, 30 * CLOCK_SECOND);
+  // PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tima));
+
   etimer_set(&periodic, SEND_INTERVAL);
 
   while (1)
@@ -392,28 +429,43 @@ PROCESS_THREAD(udp_client_process, ev, data)
     i = i + 1;
     if (RESET)
     {
-      printf("RESET !! %u\n", RESET);
-      if (msg.id == 1) /* Reset time for trafficlight 1 cycle of 30s */
+      printf("RESET");
+      if (msg.id == 1) { /* Reset time for trafficlight 1 cycle of 30s */
         etimer_set(&periodic, SEND_INTERVAL / 2);
-      else /* Trafficlight 2 cycle of 1 min for 30s shift between the 2 */
+        ND=1;
+        
+      }
+      else { /* Trafficlight 2 cycle of 1 min for 30s shift between the 2 */
         etimer_set(&periodic, SEND_INTERVAL);
+      }
       RESET = 0;
     }
+
     if (PAUSE)
     {
       printf("Pause\n");
       etimer_set(&tim, 3 * CLOCK_SECOND);
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tim));
       PAUSE = 0;
+      TT = 1;
+      state_trafficlight(my_state);
     }
     /* Send data to the server */
     /* QoS 0: Non-priority data sent every minutes with 30s shift for data sent to server every 30s */
     if (ev == PROCESS_EVENT_TIMER)
     {
-      send_packet_event();
-      if (etimer_expired(&periodic))
-      {
-        etimer_reset(&periodic);
+      if(PAUSE==1 || TT == 1){ // Verification to avoid time conflict using PAUSE
+        PAUSE=0;
+        TT=0;
+      }else {
+        send_packet_event();
+        if (etimer_expired(&periodic))
+        {
+          if(ND == 1) //To get back the normal interval
+            etimer_set(&periodic, SEND_INTERVAL);
+          else
+            etimer_reset(&periodic);
+        }
       }
     }
 

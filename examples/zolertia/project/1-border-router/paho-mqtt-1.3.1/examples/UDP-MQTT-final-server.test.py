@@ -48,6 +48,8 @@ ENABLE_LOG        = 1
 #------------------------------------------------------------#
 DEBUG_PRINT_JSON  = 1
 
+RETAIN = (0, "", 0)
+
 #------------------------------------------------------------#
 # Socket used thoughout the process
 #------------------------------------------------------------#
@@ -75,8 +77,7 @@ class SENSOR(Structure):
 #routes_dict = {}
 routes_dict = {'feu1': {'aaaa::212:4b00:60d:b318': '0', 'aaaa::212:4b00:60d:b288': '0'}, 'feu2': {'aaaa::212:4b00:60d:b41c': '2', 'aaaa::212:4b00:60d:b374': '2'}, 'feu3': {}, 'sensorRoad1': {}, 'sensorRoad2': {}} #Just for testing, automatically add new addresses and topics
 trafficlight_state = {"feu1": 0, "feu2": 2}
-trafficlight_state_conf = {"feu1":  False, "feu2": False}
-
+trafficlight_state_conf = {"feu1":  0, "feu2": 0}
 
 #------------------------------------------------------------#
 # Export expected values from messages
@@ -96,6 +97,12 @@ def jsonify_recv_QOS(msg):						# Get QoS from message
 		if f_name =="ADC3":	# Get expected value
 			QOS=getattr(msg, f_name)		
 	return str(QOS)
+
+def jsonify_recv_BATTERY(msg):						# Get battery status from message
+	for f_name, f_type in msg._fields_:
+		if f_name =="battery":	# Get expected value
+			bat=getattr(msg, f_name)		
+	return str(bat)
 
 def jsonify_recv_conf(msg, no_str=None):		# Get traffic light state from message
 	for f_name, f_type in msg._fields_:
@@ -120,7 +127,7 @@ def send_udp_cmd(msg=None):
 	except Exception as error:
 		print error
 
-def update_trafficlights_cmd(var, urgent=None):	
+def update_trafficlights_cmd(var, opt_value=None, urgent=None):	
 	if var not in routes_dict:
 		routes_dict[var] = {}
 	print routes_dict[var].keys()
@@ -132,13 +139,18 @@ def update_trafficlights_cmd(var, urgent=None):
 	for client in db:
 		# print "Sending reply to " + client
 		try:
-			data = trafficlight_state[var]
+			if opt_value:
+				data = opt_value
+			else:
+				data = trafficlight_state[var]
 			if urgent:
 				qos = 2
+				my_msg = struct.pack("III", int(data), qos, 0)
 			else:
 				qos = 0
+				my_msg = struct.pack("III", int(data), qos, 1)
 			# print "Data sent : ",data,"Qos :",qos
-			my_msg = struct.pack("III", int(data), qos, 1)
+			#my_msg = struct.pack("III", int(data), qos, 1)
 			SOCK.sendto(my_msg, (client, CMD_PORT))
 
 			#Put his confirmation on a queue + add in the message a specific id in order to retreive it 
@@ -192,87 +204,56 @@ def publish_recv_data(data, pubid, conn, addr,QOS):
 			routes_dict[TOPIC][addr] = data
 			# print str(routes_dict)
 
-		# if QOS == '2':
-		# 	print
-		# 	print "Important data received, waiting to publish"
-		# 	print
-		# if QOS=='1':
-		# 	print
-		# 	print "Data sent less once on Ubidots"
-		# 	print
-		# if QOS=='0':
-		# 	print
-		# 	print "Data directly sent to Ubidots without verification"
-		# 	print
+		if QOS == '2':
+			print
+			print "Important data received, waiting to publish"
+			print
+		if QOS=='1':
+			print
+			print "Data sent less once on Ubidots"
+			print
+		if QOS=='0':
+			print
+			print "Data directly sent to Ubidots without verification"
+			print
 		
 
-		# payload = json.dumps({"battery": 12, "uptime": 1033, "trafficlight": data, "id": pubid})
-		# conn.publish("/v1.6/devices/007d"+addr[-4:], payload, qos=int(QOS))
+		payload = json.dumps({"battery": 12, "uptime": 1033, "trafficlight": data, "id": pubid})
+		conn.publish("/v1.6/devices/007d"+addr[-4:], payload, qos=int(QOS))
 
 		# time.sleep(0.8)
 
 		
 
 		if (pubid == 5) or ((pubid == 1) and data == "2" and trafficlight_state[TOPIC] != data): # trafficlight 1 goes to green
-			#conn.publish.multiple(msgs, hostname=MQTT_URL)
 
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload="0", qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + "0" + " and QoS : "+QOS
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload=data, qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + data + " and QoS : "+QOS
+			payload = json.dumps({"feu2": 0, "feu1": data})
 
-			#payload = json.dumps({"feu1": data, "feu2": 0})
-			payload = json.dumps({"feu1": data})
-			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
 		if (pubid == 6) or ((pubid == 2) and data == "2" and trafficlight_state[TOPIC] != data): # trafficlight 2 goes to green
 
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload="0", qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + "0" + " and QoS : "+QOS
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload=data, qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
+			payload = json.dumps({"feu1": 0, "feu2": data})
 
-			#payload = json.dumps({"feu1": 0, "feu2": data})
-			payload = json.dumps({"feu1": 0})
-			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
-
-
 		if (pubid == 2) and data == "0" and trafficlight_state[TOPIC] != data: # trafficlight 2 goes to red
-			#conn.publish.multiple(msgs, hostname=MQTT_URL)
+			
+			payload = json.dumps({"feu2": data, "feu1": 2})
 
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload=data, qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload="2", qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + "2" + " and QoS : "+QOS
-			#payload = json.dumps({"feu1": 2, "feu2": data})
-			payload = json.dumps({"feu1": 2})
-			# print payload
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
 		if (pubid == 1) and data == "0" and trafficlight_state[TOPIC] != data: # trafficlight 1 goes to red
 
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload=data, qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + data + " and QoS : "+QOS
-			# # res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload="2", qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + "2" + " and QoS : "+QOS
-			#payload = json.dumps({"feu1": data, "feu2": 2})
-			payload = json.dumps({"feu1": data})
-			# print payload
+			payload = json.dumps({"feu1": data, "feu2": 2})
+
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 			
 			
-		#if data == "1" and (pubid < 3):
-		if data == "1":
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu1', payload=data, qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu1' + " with value : " + data + " and QoS : "+QOS
-			# res, mid = conn.publish(MQTT_URL_PUB + 'feu2', payload=data, qos=int(QOS))
-			# print "MQTT: Publishing to " + MQTT_URL_PUB + 'feu2' + " with value : " + data + " and QoS : "+QOS
-			#payload = json.dumps({"feu1": data, "feu2": data})
-			payload = json.dumps({"feu1": data})
-			# print payload
+		if data == "1" and (pubid < 3):
+			
+			payload = json.dumps({"feu1": data, "feu2": data})
+
 			res, mid = conn.publish(MQTT_URL_PUB, payload, qos=int(QOS))
 
 		# time.sleep(0.8)
@@ -297,16 +278,30 @@ def on_connect(client, userdata, flags, rc):
 #------------------------------------------------------------#
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
+	global RETAIN
 	print ("Published message from server ")
 	now = datetime.datetime.now()
 	print "End point : "+ str(now)
 	print(msg.topic + " " + str(msg.payload) + ", QoS: " + str(msg.qos))
 	if(msg.payload[0] != "{"):
 		var = str(msg.topic.split('/',5)[4])
-		# if(var != "feu3" and trafficlight_state[var] != msg.payload ): # Update valid and needed
+
 		if(trafficlight_state[var] != msg.payload ): # Update valid and needed
-			trafficlight_state[var] = msg.payload
-			update_trafficlights_cmd(var)
+			print trafficlight_state[var], trafficlight_state, msg.payload
+			# Condition to retain information if the first message is a green state
+			if( (var == "feu1" and trafficlight_state["feu2"] == msg.payload and msg.payload == "2") or (var == "feu2" and trafficlight_state["feu1"] == msg.payload and msg.payload == "2") ): 
+				RETAIN = (1, var, msg.payload)
+				print "RETAIN"
+			elif (msg.payload == "0" and RETAIN[0] == 1): # Applying retain
+				trafficlight_state_conf["feu1"] = 0
+				trafficlight_state_conf["feu2"] = 0
+				update_trafficlights_cmd(var, opt_value=msg.payload)
+				print "Update red with RETAIN"
+			else: #Right order do nothing
+				trafficlight_state_conf[var] = 0
+				if(msg.payload == "2"):
+					time.sleep(3)
+				update_trafficlights_cmd(var, opt_value=msg.payload)
 	print "-----------------------------------------------------------"
 
 def on_log(client, userdata, msg, buffer):
@@ -320,7 +315,7 @@ def on_publish(client, userdata, result):
 # Main function
 #------------------------------------------------------------#
 def start_client():
-	global SOCK
+	global SOCK, RETAIN
 	now = datetime.datetime.now()
 	print "UDP6-MQTT server side application "  + ID_STRING
 	print "Started " + str(now)
@@ -387,14 +382,67 @@ def start_client():
 		# Get publisher values from message
 		sensordata = jsonify_recv_data(msg_recv)	
 		QOS = jsonify_recv_QOS(msg_recv)
-		# CONFIRMATION = jsonify_recv_conf(msg_recv)
-		CONFIRMATION = '0'
+		CONFIRMATION = jsonify_recv_conf(msg_recv)
+		#CONFIRMATION = '0'
 		# print "Confirmation", CONFIRMATION
 
 		if CONFIRMATION != '0':
-			# Check with the conf queue if it's in there and if it is drop it from the queue 
+			# Check with the conf queue if it's in there and if it is, drop it from the queue 
 			# and add the value verified to trafficlight_state
-			print "Hello myself"
+			if (msg_recv.id == 1 or msg_recv.id == 3) and trafficlight_state_conf["feu1"] < 1 and trafficlight_state_conf["feu1"] >= 0:
+				trafficlight_state_conf["feu1"] = trafficlight_state_conf["feu1"] + 1
+				print " Conf Feu1 + 1:" + str(trafficlight_state_conf["feu1"])
+			if (msg_recv.id == 2 or msg_recv.id == 4) and trafficlight_state_conf["feu2"] < 1 and trafficlight_state_conf["feu2"] >= 0:
+				trafficlight_state_conf["feu2"] = trafficlight_state_conf["feu2"] + 1
+				print " Conf Feu2 + 1:" + str(trafficlight_state_conf["feu1"])
+
+			if trafficlight_state_conf["feu1"] == 1 and RETAIN[0] == 1: # Confirmation received for red state, now updating green state
+				trafficlight_state["feu1"] = sensordata 
+				trafficlight_state_conf["feu1"] = -1
+				time.sleep(3)
+				update_trafficlights_cmd(var="feu2", opt_value=RETAIN[2])
+				RETAIN = (0, '', 0)
+				print "Conf red 1 RETAIN ok => update green"
+
+			elif trafficlight_state_conf["feu2"] == 1 and RETAIN[0] == 1:
+				trafficlight_state["feu2"] = sensordata 
+				trafficlight_state_conf["feu2"] = -1
+				time.sleep(3)
+				update_trafficlights_cmd(var="feu1", opt_value=RETAIN[2])
+				RETAIN = (0, '', 0)
+				print "Conf red 2 RETAIN ok => update green"
+
+			else: # Not retained
+
+				if trafficlight_state_conf["feu1"] == 1 and sensordata == "0": # Confirmation received for red state, now updating green state
+					trafficlight_state["feu1"] = sensordata 
+					trafficlight_state_conf["feu1"] = -1
+					time.sleep(3)
+					update_trafficlights_cmd(var="feu1", opt_value=sensordata)
+					print "Conf red 1 ok => update green"
+				
+				if trafficlight_state_conf["feu2"] == 1 and sensordata == "0":
+					trafficlight_state["feu2"] = sensordata 
+					trafficlight_state_conf["feu2"] = -1
+					time.sleep(3)
+					update_trafficlights_cmd(var="feu2", opt_value=sensordata)
+					print "Conf red 2 ok => update green"	
+
+				if trafficlight_state_conf["feu1"] == 1 and sensordata == "2": # Confirmation received for green state
+					trafficlight_state["feu1"] = sensordata 
+					trafficlight_state_conf["feu1"] = -1
+					print "Conf green 1 ok"
+				
+				if trafficlight_state_conf["feu2"] == 1 and sensordata == "2":
+					trafficlight_state["feu2"] = sensordata 
+					trafficlight_state_conf["feu2"] = -1
+					print "Conf green 2 ok"
+
+
+				if trafficlight_state_conf["feu1"] == -1 and trafficlight_state_conf["feu2"] == -1: # Confirmation on the 2 road => end of cycle everything has been checked
+					print "System OK ready for next cycle"
+					trafficlight_state_conf["feu1"] = 0
+					trafficlight_state_conf["feu2"] = 0
 		else:
 
 			if ENABLE_MQTT:
@@ -403,11 +451,11 @@ def start_client():
 
 			# print routes_dict
 
-			# if QOS == "2":
-			# 	print "QOS 2 --------"
-			# 	# TO DO send all
-			# 	update_trafficlights_cmd("feu1", True)
-			# 	update_trafficlights_cmd("feu2", True)
+			if QOS == "2": # If a touch sensor message has been received => Reset the timer for all the traffic lights
+				print "QOS 2 --------"
+				# TO DO send all
+				update_trafficlights_cmd("feu1", None, True)
+				update_trafficlights_cmd("feu2", None, True)
 
 
 #------------------------------------------------------------#

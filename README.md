@@ -1,19 +1,17 @@
-The Contiki Operating System
-============================
+# Urban Traffic-light Control in IoT (IoT-UTLC) project
 
-[![Build Status](https://travis-ci.org/contiki-os/contiki.svg?branch=master)](https://travis-ci.org/contiki-os/contiki/branches)
+## Project
 
-Contiki is an open source operating system that runs on tiny low-power
-microcontrollers and makes it possible to develop applications that
-make efficient use of the hardware while providing standardized
-low-power wireless communication for a range of hardware platforms.
+This project is a proof of concept for a Urban Traffic-light Control in IoT (IoT-UTLC). It uses Contiki Os and Zolertia Re-motes for the Wireless Sensor Network and Paho MQTT and Ubidots for the connection to the Internet and the IoT Cloud Platform.
 
-Contiki is used in numerous commercial and non-commercial systems,
-such as city sound monitoring, street lights, networked electrical
-power meters, industrial monitoring, radiation monitoring,
-construction site monitoring, alarm systems, remote house monitoring,
-and so on.
+Its use case is to get a working traffic light crossroad. In addition we implemented the fact that a priority vehicle (police, ambulance...) could interrrupt the cycle of the traffic lights in order to pass its road to green.
 
-For more information, see the Contiki website:
+The main version is using a Re-motes as a Border Router and a host machine as a middleware to connect to the Internet.
+A second version, has been in early development with an Ethernet Router and autonomous Re-motes. It can be found in the `autonomous-border-router` branch.
 
-[http://contiki-os.org](http://contiki-os.org)
+To set up this project, a wiki page is available, to explain the elements we used and a step-by-step setup.
+
+## Credit
+
+This project has been initiated in a student project at ECE Paris by Jonathan HAUTERVILLE, Sohpie DUBIEF, Pierre BENEDICK, Maxime FAIVRE, Ismail MURAT and Fatih BAYRAM under the supervision of Rafik ZITOUNI. 
+It has been continued during and 4-month intership by Jérémy PETIT.

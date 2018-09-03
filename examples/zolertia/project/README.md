@@ -1,18 +1,17 @@
-# Zolertia tutorial
+# Urban Traffic-light Control in IoT (IoT-UTLC) project
 
-The following lessons will walk you through Contiki and how to implement Internet of Things applications on Zolertia devices.
+## Project
 
-The lessons are:
+This project is a proof of concept for a Urban Traffic-light Control in IoT (IoT-UTLC). It uses Contiki Os and Zolertia Re-motes for the Wireless Sensor Network and Paho MQTT and Ubidots for the connection to the Internet and the IoT Cloud Platform.
 
-* [01-basics](https://github.com/alignan/contiki/tree/iot-workshop/examples/zolertia/tutorial/01-basics): Contiki basics (timers, GPIO, LEDs).
-* [02-ipv6](https://github.com/alignan/contiki/tree/iot-workshop/examples/zolertia/tutorial/02-ipv6): Wireless networking, RF basics and IPv6/6LoWPAN implementation (UDP/TCP)
-* [03-coap](https://github.com/alignan/contiki/tree/iot-workshop/examples/zolertia/tutorial/03-coap): Example on how to implement a CoAP server
-* [04-mqtt](https://github.com/alignan/contiki/tree/iot-workshop/examples/zolertia/tutorial/04-mqtt): Example on how to implement a MQTT client
+Its use case is to get a working traffic light crossroad. In addition we implemented the fact that a priority vehicle (police, ambulance...) could interrrupt the cycle of the traffic lights in order to pass its road to green.
 
-Additionally there are ready to test applications in the `99-apps` folder.
+The main version is using a Re-motes as a Border Router and a host machine as a middleware to connect to the Internet.
+A second version, has been in early development with an Ethernet Router and autonomous Re-motes. It can be found in the `autonomous-border-router` branch.
 
-For additional resources please visit:
+To set up this project, a wiki page is available, to explain the elements we used and a step-by-step setup.
 
-* [Zolertia Wiki](https://github.com/Zolertia/Resources/wiki)
-* [Zolertia website](http://zolertia.io)
-* [Zolertia store](http://zolertia.io/store)
+## Credit
+
+This project has been initiated in a student project at ECE Paris by Jonathan HAUTERVILLE, Sohpie DUBIEF, Pierre BENEDICK, Maxime FAIVRE, Ismail MURAT and Fatih BAYRAM under the supervision of Rafik ZITOUNI. 
+It has been continued during and 4-month intership by Jérémy PETIT.
